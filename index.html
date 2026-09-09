@@ -1,21 +1,127 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>gz2008的技术博客</title>
     <style>
-        *{margin:0;padding:0;}
-        .banner{background:#888;color:#fff;text-align:center;padding:120px 20px;}
-        .banner h1{font-size:80px;}
-        .post-list{max-width:900px;margin:60px auto;padding:0 20px;}
-        .post-item{font-size:40px;font-weight:bold;color:#222;margin-bottom:10px;}
+        /* 全局基础 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #f6f9fc;          /* 柔和的背景色 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            color: #1e293b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 30px 20px;
+            line-height: 1.6;
+        }
+
+        /* 主容器，模拟卡片 */
+        .container {
+            max-width: 680px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
+            padding: 48px 40px 40px;
+            transition: box-shadow 0.3s;
+        }
+        .container:hover {
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+        }
+
+        /* 博客标题 */
+        .blog-title {
+            font-size: 2.8rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #0f172a;
+            margin-bottom: 10px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #e9edf2;
+        }
+        /* 可添加一个很淡的装饰线 */
+        .blog-title::after {
+            content: '';
+            display: block;
+            width: 60px;
+            height: 4px;
+            background: #3b82f6;
+            margin-top: 12px;
+            border-radius: 4px;
+        }
+
+        /* 文章列表 */
+        .post-list {
+            margin-top: 28px;
+            list-style: none;
+        }
+        .post-list li {
+            margin-bottom: 12px;
+        }
+        .post-list a {
+            display: block;
+            font-size: 1.45rem;
+            font-weight: 500;
+            color: #1e293b;
+            text-decoration: none;
+            padding: 16px 20px;
+            background: #f8fafc;
+            border-radius: 14px;
+            border: 1px solid #eef2f6;
+            transition: all 0.25s ease;
+        }
+        .post-list a:hover {
+            background: #ffffff;
+            border-color: #b9c7da;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+            transform: translateX(4px);
+            color: #2563eb;
+        }
+        /* 可选：加一个小箭头点缀 */
+        .post-list a::after {
+            content: '→';
+            float: right;
+            opacity: 0.3;
+            transition: opacity 0.2s;
+        }
+        .post-list a:hover::after {
+            opacity: 0.8;
+        }
+
+        /* 底部极简信息（非必需，但可保持干净） */
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eef2f6;
+            font-size: 0.9rem;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 500px) {
+            .container { padding: 30px 20px; }
+            .blog-title { font-size: 2.2rem; }
+            .post-list a { font-size: 1.2rem; padding: 14px 16px; }
+        }
     </style>
 </head>
 <body>
-    <div class="banner">
-        <h1>gz2008的技术博客</h1>
-       
-    <div class="post-list">
-        <div class="post-item"><a href="blog.html">task01 我的第一篇博客</a></div>
+    <div class="container">
+        <h1 class="blog-title">gz2008的技术博客</h1>
+        <ul class="post-list">
+            <li><a href=" ">task01 我的第一篇博客</a ></li>
+            <!-- 后续文章按相同格式添加 -->
+        </ul>
+        <div class="footer">© 2026 · 用 ❤️ 记录</div>
     </div>
 </body>
 </html>
