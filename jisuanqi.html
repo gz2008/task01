@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task03 Bugku CTF 随机数字运算验证码解题Writeup</title>
+    <style>
+        *{margin: 0;padding: 0;box-sizing: border-box;}
+        body{font-family: "Microsoft Yahei", sans-serif;line-height: 1.8;background: #f5f7fa;color: #333;padding: 20px;}
+        .container{max-width: 900px;margin: 0 auto;background: #fff;padding: 40px;border-radius: 12px;box-shadow: 0 2px 12px rgba(0,0,0,0.1);}
+        .back-btn{display: inline-block;margin-bottom: 30px;color: #2563eb;text-decoration: none;}
+        h1{font-size: 28px;margin-bottom: 30px;border-left: 4px solid #2563eb;padding-left: 12px;}
+        h2{font-size: 20px;margin: 25px 0 15px;color: #1f2937;}
+        p{margin-bottom: 12px;font-size: 16px;}
+        code{background: #f3f4f6;padding: 2px 6px;border-radius: 4px;color: #dc2626;}
+        pre{background: #1e293b;color: #e2e8f0;padding: 20px;border-radius: 8px;overflow-x: auto;margin: 15px 0;}
+        .flag-box{background: #ecfdf5;border: 1px solid #10b981;padding: 15px;border-radius: 8px;font-size: 18px;font-weight: bold;color: #065f46;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-btn">← 返回博客首页</a>
+        <h1>task03 Bugku CTF 随机数字运算验证码解题Writeup</h1>
+        <div class="content">
+            <h2>题目信息</h2>
+            <p>平台：Bugku CTF</p>
+            <p>分类：Web入门自动化交互</p>
+            <p>分值：10分</p>
+
+            <h2>解题思路</h2>
+            <p>打开挑战页面后会持续刷新随机加减乘运算题，手动输入完全无法满足页面的响应时限，常规人工操作根本不可能通关。核心考点是通过浏览器原生JS实现全自动运算+提交的闭环逻辑，同时要规避eval误解析页面底部BugKu-ctf无关文本的报错坑。</p>
+
+            <h2>详细步骤</h2>
+            <p>1.  进入题目详情页，按下快捷键 <code>F12</code> 打开浏览器开发者工具，切换到「控制台」标签页</p>
+            <p>2.  先粘贴清空历史残留定时器的代码，避免后台旧任务报错干扰，按回车执行</p>
+            <p>3.  再粘贴全自动运算提交脚本，按回车运行，脚本会自动循环执行几十轮运算提交</p>
+            <p>4.  数秒后页面自动弹出flag，直接复制提交即可通关</p>
+
+            <h2>完整通关脚本</h2>
+<pre>// 清空所有后台残留的历史定时器
+for(let i = 1; i < 9999; i++) clearInterval(i);
+
+// 全自动运算提交脚本
+setInterval(() => {
+    // 精准定位顶部运算块，完全避开下方无关链接文本
+    let qsText = document.querySelector("body").children[0].innerText;
+    // 正则提取两个运算数自动转数值
+    let numList = qsText.match(/\d+/g);
+    let a = +numList[0], b = +numList[1];
+    // 提取运算符号
+    let op = qsText.match(/[+\-*/]/)[0];
+    // 手动分支运算，彻底抛弃eval避免误解析
+    let result;
+    if(op === '+') result = a + b;
+    else if(op === '-') result = a - b;
+    else if(op === '*') result = a * b;
+    else if(op === '/') result = a / b;
+    // 自动填答案点击验证按钮
+    let inputs = document.getElementsByTagName("input");
+    inputs[0].value = result;
+    inputs[1].click();
+}, 50);
+</pre>
+
+            <h2>最终Flag</h2>
+            <div class="flag-box">
+                flag{你通关后页面弹出的实际flag内容}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
