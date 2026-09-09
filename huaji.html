@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task03 Bugku CTF 滑稽题解题Writeup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #f6f9fc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            color: #1e293b;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 30px 20px;
+            line-height: 1.8;
+            animation: pageFadeIn 0.6s ease-out;
+        }
+        @keyframes pageFadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .container {
+            max-width: 680px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
+            padding: 48px  }
+        .back-btn {
+            display40px 40px;
+       : inline-block;
+            color: #3b82f6;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .back-btn:hover {
+            color: #2563eb;
+        }
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid #e9edf2;
+        }
+        h1::after {
+            content: '';
+            display: block;
+            width: 60px;
+            height: 4px;
+            background: #3b82f6;
+            margin-top: 12px;
+            border-radius: 4px;
+        }
+        .content {
+            margin-top: 30px;
+            font-size: 1.1rem;
+        }
+        .content h2 {
+            font-size: 1.4rem;
+            margin: 24px 0 12px;
+            color: #1e293b;
+        }
+        .content p {
+            margin-bottom: 12px;
+        }
+        .flag-box {
+            background: #f0f4ff;
+            padding: 16px 20px;
+            border-radius: 12px;
+            border-left: 4px solid #3b82f6;
+            font-weight: 500;
+            color: #1d4ed8;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eef2f6;
+            font-size: 0.9rem;
+            color: #94a3b8;
+            text-align: center;
+        }
+        @media (max-width: 500px) {
+            .container { padding: 30px 20px; }
+            h1 { font-size: 1.7rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-btn">← 返回博客首页</a>
+        <h1>task03 Bugku CTF 滑稽题解题Writeup</h1>
+        <div class="content">
+            <h2>题目信息</h2>
+            <p>平台：Bugku CTF</p>
+            <p>分类：WEB入门</p>
+            <p>分值：10分</p>
+
+            <h2>解题思路</h2>
+            <p>这是一道最基础的WEB入门题，打开挑战页面后满屏都是滑稽表情包，没有直接显示flag。这类入门题的flag通常会被隐藏在网页的源代码注释里。</p>
+
+            <h2>详细步骤</h2>
+            <p>1. 进入题目详情页，点击「启动场景」打开满屏滑稽的挑战页面</p>
+            <p>2. 直接在页面空白处按下快捷键 <code>Ctrl + U</code>，一键打开网页源代码</p>
+            <p>3. 在源码页面按下 <code>Ctrl + F</code> 调出搜索框，输入flag直接定位到隐藏的答案</p>
+
+            <h2>最终Flag</h2>
+            <div class="flag-box">
+                flag{989cc848f08efe39af62ebaa35d800f9}
+            </div>
+
+            <h2>考点总结</h2>
+            <p>这道题考察最基础的网页前端知识，学会通过查看页面源代码获取隐藏信息，是所有WEB方向CTF题的入门第一课。</p>
+        </div>
+        <div class="footer">© 2026 · gz2008的技术博客</div>
+    </div>
+</body>
+</html>
