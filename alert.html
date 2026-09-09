@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task04 Bugku CTF alert弹窗题解题Writeup</title>
+    <style>
+        *{margin: 0;padding: 0;box-sizing: border-box;}
+        body{font-family: "Microsoft Yahei", sans-serif;line-height: 1.8;background: #f5f7fa;color: #333;padding: 20px;}
+        .container{max-width: 900px;margin: 0 auto;background: #fff;padding: 40px;border-radius: 12px;box-shadow: 0 2px 12px rgba(0,0,0,0.1);}
+        .back-btn{display: inline-block;margin-bottom: 30px;color: #2563eb;text-decoration: none;}
+        h1{font-size: 28px;margin-bottom: 30px;border-left: 4px solid #2563eb;padding-left: 12px;}
+        h2{font-size: 20px;margin: 25px 0 15px;color: #1f2937;}
+        p{margin-bottom: 12px;font-size: 16px;}
+        code{background: #f3f4f6;padding: 2px 6px;border-radius: 4px;color: #dc2626;}
+        pre{background: #1e293b;color: #e2e8f0;padding: 20px;border-radius: 8px;overflow-x: auto;margin: 15px 0;}
+        .flag-box{background: #ecfdf5;border: 1px solid #10b981;padding: 15px;border-radius: 8px;font-size: 18px;font-weight: bold;color: #065f46;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-btn">← 返回博客首页</a>
+        <h1>task04 Bugku CTF alert弹窗题解题Writeup</h1>
+        <div class="content">
+            <h2>题目信息</h2>
+            <p>平台：Bugku CTF</p>
+            <p>分类：Web入门JS基础</p>
+            <p>分值：10分</p>
+
+            <h2>解题思路</h2>
+            <p>打开挑战页面后会循环弹出alert弹窗，手动点确定根本点不完，flag没有直接显示在弹窗里，而是用HTML实体编码藏在了页面最底部的注释里，直接查看网页源代码解码就能拿到flag。</p>
+
+            <h2>详细步骤</h2>
+            <p>1.  打开题目给出的挑战场景链接</p>
+            <p>2.  直接按下快捷键 <code>Ctrl + U</code> 一键打开网页源代码页面</p>
+            <p>3.  拉到页面最底部，找到被注释包裹的全量HTML实体编码内容</p>
+            <p>4.  把编码内容复制到控制台，用 <code>document.write()</code> 方法直接自动解码，得到完整flag</p>
+
+            <h2>通关代码</h2>
+<pre>// 把源码里复制的HTML实体编码粘贴进括号里，直接自动解码
+document.write("&#102;&#108;&#97;&#103;&#123;&#49;&#102;&#102;&#99;&#102;&#100;&#54;&#53;&#102;&#53;&#102;&#48;&#98;&#49;&#55;&#101;&#100;&#102;&#51;&#99;&#54;&#53;&#50;&#49;&#97;&#55;&#55;&#53;&#100;&#98;&#97;&#48;&#125;")
+</pre>
+
+            <h2>最终Flag</h2>
+            <div class="flag-box">
+                flag{1ffcfd65f5f0b17edf3c6521a775dba0}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
