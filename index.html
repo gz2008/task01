@@ -12,7 +12,7 @@
             box-sizing: border-box;
         }
         body {
-            background: #f6f9fc;          /* 柔和的背景色 */
+            background: #f6f9fc;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
             color: #1e293b;
             display: flex;
@@ -21,6 +21,13 @@
             min-height: 100vh;
             padding: 30px 20px;
             line-height: 1.6;
+            /* 页面淡入加载效果 */
+            animation: pageFadeIn 0.6s ease-out;
+        }
+
+        @keyframes pageFadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* 主容器，模拟卡片 */
@@ -47,7 +54,6 @@
             padding-bottom: 20px;
             border-bottom: 3px solid #e9edf2;
         }
-        /* 可添加一个很淡的装饰线 */
         .blog-title::after {
             content: '';
             display: block;
@@ -67,7 +73,9 @@
             margin-bottom: 12px;
         }
         .post-list a {
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             font-size: 1.45rem;
             font-weight: 500;
             color: #1e293b;
@@ -85,10 +93,25 @@
             transform: translateX(4px);
             color: #2563eb;
         }
-        /* 可选：加一个小箭头点缀 */
+        /* 文章标题样式 */
+        .post-title {
+            display: inline-block;
+            flex: 1;
+        }
+        /* 发布时间样式 */
+        .post-date {
+            font-size: 0.95rem;
+            color: #94a3b8;
+            font-weight: 400;
+            margin-right: 12px;
+            transition: color 0.25s ease;
+        }
+        .post-list a:hover .post-date {
+            color: #64748b;
+        }
+        /* 导航箭头点缀 */
         .post-list a::after {
             content: '→';
-            float: right;
             opacity: 0.3;
             transition: opacity 0.2s;
         }
@@ -96,7 +119,7 @@
             opacity: 0.8;
         }
 
-        /* 底部极简信息（非必需，但可保持干净） */
+        /* 底部极简信息 */
         .footer {
             margin-top: 40px;
             padding-top: 20px;
@@ -111,6 +134,7 @@
             .container { padding: 30px 20px; }
             .blog-title { font-size: 2.2rem; }
             .post-list a { font-size: 1.2rem; padding: 14px 16px; }
+            .post-date { font-size: 0.8rem; }
         }
     </style>
 </head>
@@ -118,13 +142,19 @@
     <div class="container">
         <h1 class="blog-title">gz2008的技术博客</h1>
         <ul class="post-list">
-            <li><a href="blog.html">task01 我的第一篇博客</a ></li>
-            <!-- 后续文章按相同格式添加 -->
+            <li>
+                <a href="blog.html">
+                    <span class="post-title">task01 我的第一篇博客</span>
+                    <span class="post-date">2026-09-09</span>
+                </a>
+            </li>
+            <!-- 后续新增文章直接复制上面的li块，修改标题和日期即可 -->
         </ul>
         <div class="footer">© 2026 · 用 ❤️ 记录</div>
     </div>
 </body>
 </html>
+
 
 
 
