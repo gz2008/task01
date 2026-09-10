@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task08 Bugku CTF POST解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background-color: #f5f5ff;
+            color: #333333;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .back-link {
+            display: inline-block;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a1a1a;
+            border-left: 5px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 30px;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin-top: 35px;
+            margin-bottom: 15px;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #444444;
+            font-size: 18px;
+        }
+        ol {
+            padding-left: 28px;
+            margin-bottom: 16px;
+            color: #444444;
+        }
+        ol li {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 17px;
+            overflow-x: auto;
+            margin: 15px 0 25px 0;
+            line-height: 1.6;
+        }
+        .flag-block {
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            word-break: break-all;
+            margin: 15px 0 20px 0;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 26px; }
+            h2 { font-size: 20px; }
+            p, ol li { font-size: 16px; }
+            .code-block, .flag-block { font-size: 15px; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回博客首页</a>
+
+        <h1>task08 Bugku CTF POST解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>
+        分类: Web入门POST请求考点<br>
+        分值: 10分</p>
+
+        <h2>解题思路</h2>
+        <p>这道题是最基础的POST请求考点，服务器不会从URL的GET参数里读取数据，而是等待客户端通过POST请求体提交名为what、值为flag的参数，校验通过之后就会返回最终flag。不需要额外安装工具，直接用浏览器控制台的fetch函数就能快速构造POST请求完成提交。</p>
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>点击页面上的「启动场景」打开挑战页面</li>
+            <li>按下F12打开开发者工具，切换到「控制台」标签页</li>
+            <li>输入构造好的fetch POST请求代码，按回车执行</li>
+            <li>服务器校验POST参数通过，直接返回完整flag</li>
+        </ol>
+
+        <h2>控制台执行代码</h2>
+        <div class="code-block">
+fetch(window.location.href, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/x-www-form-urlencoded'
+  },
+  body: 'what=flag'
+}).then(res => res.text()).then(console.log)
+        </div>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+flag{这里替换成你实际拿到的flag内容}
+        </div>
+    </div>
+</body>
+</html>
