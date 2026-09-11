@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task11 Bugku CTF 这是一张单纯的图片解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background-color: #f5f5ff; color: #333333; line-height: 1.7; padding: 20px; max-width: 900px; margin: 0 auto; }
+        .container { background-color: #ffffff; border-radius: 16px; padding: 40px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .back-link { display: inline-block; color: #2563eb; text-decoration: none; font-size: 18px; margin-bottom: 30px; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 36px; font-weight: bold; color: #1a1a1a; border-left: 5px solid #3b82f6; padding-left: 15px; margin-bottom: 30px; margin-top: 0; line-height: 1.3; }
+        h2 { font-size: 24px; font-weight: bold; color: #1a1a1a; margin-top: 35px; margin-bottom: 15px; }
+        p { margin-bottom: 16px; color: #444444; font-size: 18px; }
+        ol { padding-left: 28px; margin-bottom: 16px; color: #444444; }
+        ol li { margin-bottom: 10px; font-size: 18px; }
+        .code-block { background-color: #1e293b; color: #f8fafc; padding: 20px; border-radius: 12px; font-family: "Courier New", Courier, monospace; font-size: 17px; overflow-x: auto; margin: 15px 0 25px 0; line-height: 1.6; }
+        .flag-block { background-color: #f0fdf4; border: 1px solid #86efac; color: #166534; padding: 20px; border-radius: 12px; font-family: "Courier New", Courier, monospace; font-size: 18px; font-weight: bold; word-break: break-all; margin: 15px 0 20px 0; }
+        @media (max-width: 600px) { .container { padding: 20px; } h1 { font-size: 26px; } h2 { font-size: 20px; } p, ol li { font-size: 16px; } .code-block, .flag-block { font-size: 15px; padding: 15px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href=" " class="back-link">← 返回博客首页</a >
+
+        <h1>task11 Bugku CTF 这是一张单纯的图片解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>分类: MISC - 图片隐写<br>日期: 9月11日<br>分值: 10分</p >
+
+        <h2>解题思路</h2>
+        <p>题目名为“这是一张单纯的图片”，描述给出了提示 <code>key{}</code>。下载图片后直接用记事本搜索 <code>key</code> 找不到明文，说明使用了编码。我们使用记事本打开图片，按 <code>Ctrl+End</code> 跳转到文件末尾，发现了一串 <b>HTML 实体编码</b>（类似 <code>&#107;&#101;...</code>）。</p >
+        <p><b>解题技巧：</b>利用浏览器天生支持渲染 HTML 的特性，直接将图片文件的后缀名从 <code>.jpg</code> 修改为 <code>.html</code>，然后用浏览器打开。浏览器会自动将实体编码解析为人类可读的明文，直接获取 Flag。</p >
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>下载图片，右键用“记事本”打开。</li>
+            <li>按 <code>Ctrl+End</code> 跳到文件最末尾，发现编码：<br>
+            <code>&#107;&#101;&#121;&#123;&#49;&#50;&#51;&#95;&#119;&#117;&#32;&#97;&#114;&#101;&#32;&#115;&#111;&#32;&#99;&#117;&#116;&#101;&#125;</code></li>
+            <li>右键图片，选择“重命名”，将后缀 <code>.jpg</code> 改为 <code>.html</code>。</li>
+            <li>双击用浏览器打开这个 HTML 文件，浏览器自动将编码解析为：<code>key{123_wu are so cute}</code>。</li>
+            <li>复制该字符串并提交。若平台禁止空格，则将空格替换为下划线后提交：<code>key{123_wu_are_so_cute}</code>。</li>
+        </ol>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+key{123_wu_are_so_cute}
+        </div>
+    </div>
+</body>
+</html>
