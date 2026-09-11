@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task09 Bugku CTF 解题WriteUp</title>
+    <title>task09 Bugku CTF source解题WriteUp</title>
     <style>
         /* 完全复用你之前统一的页面样式 */
         body {
@@ -98,42 +99,45 @@
     <div class="container">
         <a href=" " class="back-link">← 返回博客首页</a >
 
-        <h1>task09 Bugku CTF 解题WriteUp</h1>
+        <h1>task09 Bugku CTF source解题WriteUp</h1>
 
         <h2>题目信息</h2>
         <p>平台: Bugku CTF<br>
-        分类: Web入门（请根据实际情况修改）<br>
+        分类: Web入门 - Git源码泄露<br>
         日期: 9月11日<br>
         分值: 10分</p >
 
         <h2>解题思路</h2>
-        <p>这道题的核心考点是【请在此处填入考点，例如：HTTP头部伪造/GET传参/变量覆盖等】。通过【请在此处简述你是如何发现线索的，例如：查看页面源码、抓包分析等】，我们可以构造特定的请求来满足服务器的校验条件，从而拿到最终的 flag。</p >
+        <p>这道题的名称是 source（源码），考点是 <b>Git 源码泄露</b>。服务器错误地将隐藏的 <code>.git</code> 目录暴露在了公网上，我们可以通过下载该目录中的文件，回溯 Git 的历史提交记录，从而找到被删除或者隐藏的 Flag。</p >
+        <p>常规的 <code>git clone</code> 命令由于服务器未开启相关协议而报错，因此我们使用了更强大的工具 <code>git-dumper</code> 来完成源码拉取，并使用 <code>git reflog</code> 和 <code>git show</code> 命令来查看被隐藏的提交内容。</p >
 
         <h2>详细步骤</h2>
         <ol>
-            <li>点击页面上的「启动场景」打开挑战页面</li>
-            <li>按下F12打开开发者工具，或使用 Burp Suite 进行抓包</li>
-            <li>根据题目要求，修改请求头或请求参数（请在此处补充具体修改内容）</li>
-            <li>发送请求，服务器校验通过，成功返回完整 flag</li>
+            <li>打开题目网页（如 <code>http://160.202.254.160:13273/</code>），页面只显示 Hello, world! 没有任何有效信息。</li>
+            <li>猜测并尝试访问隐藏目录：在浏览器中访问 <code>http://160.202.254.160:13273/.git/</code>，发现返回了 403 Forbidden 或目录列表，确认存在 Git 源码泄露。</li>
+            <li>打开 Git Bash 命令行工具，尝试使用 <code>git clone</code> 命令下载源码，但提示 <code>fatal: repository ... not found</code>，说明服务器拒绝了标准的 Git 协议请求。</li>
+            <li>改用 <b>git-dumper</b> 工具，直接通过 HTTP 协议抓取整个 .git 目录并在本地还原仓库：<br><code>git-dumper http://160.202.254.160:13273/.git/ ./source</code></li>
+            <li>下载成功后，进入源码目录：<code>cd source</code></li>
+            <li>查看 Git 历史操作记录：<code>git reflog</code>，发现一条可疑的提交记录，哈希值为 <code>40c6d51</code>，提交信息为 "commit: flag is here?"。</li>
+            <li>查看该具体提交修改了哪些内容：<code>git show 40c6d51</code>，发现它将 flag.txt 文件中的 <code>flag{nonono}</code> 修改为了真正的 Flag。</li>
         </ol>
 
-        <h2>构造的请求/Payload</h2>
+        <h2>关键命令</h2>
         <div class="code-block">
-// 请在此处替换成你实际使用的代码或命令
-// 例如 fetch 请求：
-fetch(window.location.href, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'Referer': 'https://www.bugku.com' // 根据题目修改
-  },
-  body: 'what=flag' // 根据题目修改
-}).then(res => res.text()).then(console.log)
+# 1. 使用 git-dumper 拉取源码
+git-dumper http://靶场IP:端口/.git/ ./source
+
+# 2. 进入目录并查看历史记录
+cd source
+git reflog
+
+# 3. 查看哈希为 40c6d51 的提交修改内容
+git show 40c6d51
         </div>
 
         <h2>最终Flag</h2>
         <div class="flag-block">
-flag{这里替换成你实际拿到的flag内容}
+flag{git_is_good_distributed_version_control_system}
         </div>
     </div>
 </body>
