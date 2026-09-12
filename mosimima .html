@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task12 Bugku CTF /. - 解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background-color: #f5f5ff; color: #333333; line-height: 1.7; padding: 20px; max-width: 900px; margin: 0 auto; }
+        .container { background-color: #ffffff; border-radius: 16px; padding: 40px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .back-link { display: inline-block; color: #2563eb; text-decoration: none; font-size: 18px; margin-bottom: 30px; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 36px; font-weight: bold; color: #1a1a1a; border-left: 5px solid #3b82f6; padding-left: 15px; margin-bottom: 30px; margin-top: 0; line-height: 1.3; }
+        h2 { font-size: 24px; font-weight: bold; color: #1a1a1a; margin-top: 35px; margin-bottom: 15px; }
+        p { margin-bottom: 16px; color: #444444; font-size: 18px; }
+        ol { padding-left: 28px; margin-bottom: 16px; color: #444444; }
+        ol li { margin-bottom: 10px; font-size: 18px; }
+        .code-block { background-color: #1e293b; color: #f8fafc; padding: 20px; border-radius: 12px; font-family: "Courier New", Courier, monospace; font-size: 17px; overflow-x: auto; margin: 15px 0 25px 0; line-height: 1.6; }
+        .flag-block { background-color: #f0fdf4; border: 1px solid #86efac; color: #166534; padding: 20px; border-radius: 12px; font-family: "Courier New", Courier, monospace; font-size: 18px; font-weight: bold; word-break: break-all; margin: 15px 0 20px 0; }
+        @media (max-width: 600px) { .container { padding: 20px; } h1 { font-size: 26px; } h2 { font-size: 20px; } p, ol li { font-size: 16px; } .code-block, .flag-block { font-size: 15px; padding: 15px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html " class="back-link">← 返回博客首页</a >
+
+        <h1>task46 Bugku CTF /. - 解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>分类: Crypto - 摩斯密码<br>日期: 9月11日<br>分值: 10分</p >
+
+        <h2>解题思路</h2>
+        <p>题目名称为 <code>/. -</code>，给出的密文由大量的 <code>.</code>（点）、<code>-</code>（横线）和 <code>/</code>（分隔符）组成，这是非常典型的 <b>摩尔斯电码（Morse Code）</b>。</p >
+        <p><b>解题技巧（防套路警告）：</b>这道题是一道经典的“防自动化脚本”坑题。直接摩斯解码后得到的字符串为 <code>FLAG9MD3FCBF17F93995040A</code>。但仔细观察会发现三个严重的干扰项：</p >
+        <ol>
+            <li>开头的 <code>FLAG</code> 是伪装的前缀，并非有效载荷。</li>
+            <li>中间的 <code>9M</code> 中，<code>M</code> 不是合法的十六进制字符（十六进制只有 0-9 和 A-F），这是出题人故意留下的陷阱或笔误。</li>
+            <li>结尾的 <code>0A</code> 同样是多余的后缀干扰。</li>
+        </ol>
+        <p>因此，我们需要人工剔除干扰项，提取出中间看起来像 MD5 哈希值（16位十六进制）的核心部分 <code>D3FCBF17F9399504</code>。最后结合评论区提示“全部变成小写字母”，得到最终答案。</p >
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>复制题目描述中的摩斯密码密文。</li>
+            <li>打开在线摩斯密码解码工具（如 Bugku 工具库或土薯在线工具），将密文粘贴进去进行解码。</li>
+            <li>得到初始解码结果：<code>FLAG9MD3FCBF17F93995040A</code>。</li>
+            <li>分析结果，弃掉开头的 <code>FLAG</code> 前缀、中间无法转换的 <code>9M</code> 乱码、以及结尾的 <code>0A</code> 后缀。</li>
+            <li>提取出纯粹的有效载荷：<code>D3FCBF17F9399504</code>。</li>
+            <li>将该字符串全部转换为小写：<code>d3fcbf17f9399504</code>，并加上大括号提交。</li>
+        </ol>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+{d3fcbf17f9399504}
+        </div>
+    </div>
+</body>
+</html>
