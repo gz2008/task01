@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task16 Bugku CTF 入门逆向解题WriteUp</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background-color: #f5f5ff; color: #333333; line-height: 1.7; padding: 20px; max-width: 900px; margin: 0 auto; }
+        .container { background-color: #ffffff; border-radius: 16px; padding: 40px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .back-link { display: inline-block; color: #2563eb; text-decoration: none; font-size: 18px; margin-bottom: 30px; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 36px; font-weight: bold; color: #1a1a1a; border-left: 5px solid #3b82f6; padding-left: 15px; margin-bottom: 30px; margin-top: 0; line-height: 1.3; }
+        h2 { font-size: 24px; font-weight: bold; color: #1a1a1a; margin-top: 35px; margin-bottom: 15px; }
+        p { margin-bottom: 16px; color: #444444; font-size: 18px; }
+        ol { padding-left: 28px; margin-bottom: 16px; color: #444444; }
+        ol li { margin-bottom: 10px; font-size: 18px; }
+        .code-block { background-color: #1e293b; color: #f8fafc; padding: 20px; border-radius: 12px; font-family: "Courier New", Courier, monospace; font-size: 17px; overflow-x: auto; margin: 15px 0 25px 0; line-height: 1.6; }
+        .flag-block { background-color: #f0fdf4; border: 1px solid #86efac; color: #166534; padding: 20px; border-radius: 12px; font-family: "Courier New", Courier, monospace; font-size: 18px; font-weight: bold; word-break: break-all; margin: 15px 0 20px 0; }
+        @media (max-width: 600px) { .container { padding: 20px; } h1 { font-size: 26px; } h2 { font-size: 20px; } p, ol li { font-size: 16px; } .code-block, .flag-block { font-size: 15px; padding: 15px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href=" " class="back-link">← 返回博客首页</a >
+
+        <h1>task16 Bugku CTF 入门逆向解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>分类: Reverse - 入门逆向<br>日期: 9月11日<br>分值: 10分</p >
+
+        <h2>解题思路与过程（排错记录）</h2>
+        <p>下载附件解压得到 <code>baby.exe</code>。在尝试提取明文字符串时遇到了极大阻力，特此记录完整的排错过程：</p >
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li><b>尝试提取字符串（全部失败）：</b><br>
+            在 Git Bash 中使用 <code>strings</code> 提示命令不存在，改用 <code>grep -a</code> 输出乱码；尝试在 CyberChef 中使用 <code>Strings</code> 操作也未能找到完整的 <code>flag{</code> 字符串。</li>
+            <li><b>发现根本原因：</b><br>
+            通过查阅解题提示和分析，发现此题出题人没有把 Flag 作为连续字符串存放在数据段中，而是将其拆解成了单字符的 <code>mov</code> 汇编指令（形如 <code>mov [ebp-4], 66h</code>）写在了代码段中。因此常规的字符串提取工具无法抓取。</li>
+            <li><b>手工还原 Flag：</b><br>
+            使用 IDA 等反汇编工具打开文件，定位到 <code>_main</code> 函数。可以观察到从高地址到低地址（或按逻辑顺序排列）的一系列十六进制立即数。将它们按顺序提取出来：<br>
+            <code>66h 6Ch 61h 67h 7Bh 52h 65h 5Fh 31h 73h 5Fh 53h 30h 5Fh 43h 30h 4Fh 4Ch 7Dh</code></li>
+            <li><b>ASCII 码转换：</b><br>
+            对照 ASCII 码表（或使用在线十六进制转 ASCII 工具）逐个转换：
+            <div class="code-block">
+66 -> f
+6C -> l
+61 -> a
+67 -> g
+7B -> {
+52 -> R
+65 -> e
+5F -> _
+31 -> 1
+73 -> s
+...以此类推...
+            </div>
+            </li>
+            <li>拼接所有字符，最终得到明文的 Flag。</li>
+        </ol>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+flag{Re_1s_S0_C0OL}
+        </div>
+    </div>
+</body>
+</html>
