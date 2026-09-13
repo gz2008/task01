@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task17 Bugku CTF - [MISC] linux 解题 WriteUp</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background-color: #f5f5ff; color: #333333; line-height: 1.7; padding: 20px; max-width: 900px; margin: 0 auto; }
+        .container { background-color: #ffffff; border-radius: 16px; padding: 40px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .back-link { display: inline-block; color: #2563eb; text-decoration: none; font-size: 18px; margin-bottom: 30px; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 36px; font-weight: bold; color: #1a1a1a; border-left: 5px solid #3b82f6; padding-left: 15px; margin-bottom: 30px; margin-top: 0; line-height: 1.3; }
+        h2 { font-size: 24px; font-weight: bold; color: #1a1a1a; margin-top: 35px; margin-bottom: 15px; }
+        p { margin-bottom: 16px; color: #444444; font-size: 18px; }
+        ol { padding-left: 28px; margin-bottom: 16px; color: #444444; }
+        ol li { margin-bottom: 10px; font-size: 18px; }
+        .code-block { background-color: #1e293b; color: #f8fafc; padding: 20px; border-radius: 12px; font-family: "Courier New", Courier, monospace; font-size: 17px; overflow-x: auto; margin: 15px 0 25px 0; line-height: 1.6; }
+        .flag-block { background-color: #f0fdf4; border: 1px solid #86efac; color: #166534; padding: 20px; border-radius: 12px; font-family: "Courier New", Courier, monospace; font-size: 18px; font-weight: bold; word-break: break-all; margin: 15px 0 20px 0; }
+        @media (max-width: 600px) { .container { padding: 20px; } h1 { font-size: 26px; } h2 { font-size: 20px; } p, ol li { font-size: 16px; } .code-block, .flag-block { font-size: 15px; padding: 15px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html " class="back-link">← 返回博客首页</a >
+
+        <h1>task17 Bugku CTF - [MISC] linux 解题 WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>分类: MISC<br>日期: 9月13日<br>分值: 15分</p >
+
+        <h2>解题思路与过程（排错记录）</h2>
+        <p>本题核心考察 Linux 基础命令，附件 <code>linux.zip</code> 需要多层解压并提取字符串。但在解题前，本地环境搭建遇到了极大的阻碍，特此记录完整的排错过程：</p >
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li><b>环境排错与 WSL 搭建：</b><br>
+            初始在 Windows 下使用 WSL 安装 Ubuntu 报错 <code>0x8007019e</code>。尝试开启系统功能时提示权限不足；随后安装 WSL2 内核更新包报错 <code>0x80071772</code>，向导提前退出。<br>
+            最终通过进入 <b>设置 -> Windows 更新</b>，点击“全部下载并安装”打满所有系统补丁（包括 .NET Framework 和安全更新），并确保任务管理器中 CPU 虚拟化已开启。重启电脑后，再次打开 Ubuntu，成功进入初始化界面，设置用户名 <code>gzw</code> 及密码，完成 Linux 环境搭建。</li>
+            
+            <li><b>第一层解压（unzip）：</b><br>
+            附件存于 Windows 的 <code>D:\Open Browser下载</code> 目录下。在 Ubuntu 终端中通过 <code>/mnt/d/</code> 挂载路径进入该目录，并执行第一层解压：
+            <div class="code-block">
+cd "/mnt/d/Open Browser下载"<br>
+ls<br>
+unzip linux.zip
+            </div>
+            解压后得到 <code>linux</code> 文件夹，里面包含一个 <code>1.tar.gz</code> 文件。</li>
+            
+            <li><b>第二层解压（tar.gz）：</b><br>
+            进入解压出的 <code>linux</code> 目录，确认目录下有 <code>1.tar.gz</code> 文件，执行二次解压：
+            <div class="code-block">
+cd linux<br>
+ls<br>
+tar -zxvf 1.tar.gz
+            </div>
+            解压后得到 <code>test</code> 文件夹，里面包含一个名为 <code>flag</code> 的文件。</li>
+            
+            <li><b>提取 Flag：</b><br>
+            进入 <code>test</code> 文件夹（注意文件夹名为 <code>test</code>，切勿打成 <code>text</code>）。尝试查看 <code>flag</code> 文件内容：
+            <div class="code-block">
+cd test<br>
+cat flag
+            </div>
+            由于文件包含特殊字符，直接 cat 会输出一长串乱码。但仔细观察，能在乱码的末尾成功发现目标字符串，或者使用 strings 命令配合过滤：
+            <div class="code-block">
+strings flag | grep key
+            </div>
+            </li>
+        </ol>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+key{feb81d3834e2423c9903f4755464060b}
+        </div>
+    </div>
+</body>
+</html>
