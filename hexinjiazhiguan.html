@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task18 Bugku CTF [富强民主]解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background-color: #f5f5ff;
+            color: #333333;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .back-link {
+            display: inline-block;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a1a1a;
+            border-left: 5px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 30px;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin-top: 35px;
+            margin-bottom: 15px;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #444444;
+            font-size: 18px;
+        }
+        ol {
+            padding-left: 28px;
+            margin-bottom: 16px;
+            color: #444444;
+        }
+        ol li {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 17px;
+            overflow-x: auto;
+            margin: 15px 0 25px 0;
+            line-height: 1.6;
+        }
+        .flag-block {
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            word-break: break-all;
+            margin: 15px 0 20px 0;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 26px; }
+            h2 { font-size: 20px; }
+            p, ol li { font-size: 16px; }
+            .code-block, .flag-block { font-size: 15px; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回博客首页</a>
+
+        <h1>task18 Bugku CTF [富强民主]解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>
+        分类: MISC - 社会主义核心价值观编码<br>
+        日期: 9月11日<br>
+        分值: 15分</p>
+
+        <h2>解题思路</h2>
+        <p>题目名称为 <code>富强民主</code>，题目描述是由“富强、民主、文明、和谐、自由、平等、公正、法治、爱国、敬业、诚信、友善”这12个词汇组成的乱序文本。这是典型的 <b>社会主义核心价值观编码</b>。该编码本质上是一种 12 进制（0-11）的替换密码，将每个词映射为对应的数字后进行转换即可解码。本题直接使用 Bugku 平台自带的在线工具即可快速解密。</p>
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>直接全选复制题目描述中给出的所有文本。</li>
+            <li>打开 Bugku 在线工具箱（或搜索“社会主义核心价值观编码在线解码”）。</li>
+            <li>将复制的文本粘贴到工具的解码输入框中。</li>
+            <li>点击“解码”或“提交”按钮。</li>
+            <li>工具会自动将 12 进制数字转换为 ASCII/UTF-8 字符串，输出结果即为 Flag。</li>
+        </ol>
+
+        <h2>工具及操作说明</h2>
+        <div class="code-block">
+# 推荐在线工具（无需下载软件，直接网页解密）：
+https://ctf.bugku.com/tool/cvecode
+
+# 操作顺序：
+1. 复制题目描述中的所有词汇 -> 粘贴到网页输入框
+2. 点击 "解码"
+3. 输出结果即为 Flag
+
+# 附：Python 脚本一键解密备选方案
+words = "富强民主文明和谐自由平等公正法治爱国敬业诚信友善"
+mapping = {words[i*2:i*2+2]: i for i in range(12)}
+cipher = "把题目描述粘贴到这里"
+nums = [mapping[cipher[i:i+2]] for i in range(0, len(cipher), 2)]
+total = 0
+for n in nums:
+    total = total * 12 + n
+print(total.to_bytes((total.bit_length() + 7) // 8, 'big').decode())
+        </div>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+flag{90025f7fb1959936}
+        </div>
+    </div>
+</body>
+</html>
