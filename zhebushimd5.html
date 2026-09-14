@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task21 Bugku CTF [这不是md5]解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background-color: #f5f5ff;
+            color: #333333;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .back-link {
+            display: inline-block;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a1a1a;
+            border-left: 5px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 30px;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin-top: 35px;
+            margin-bottom: 15px;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #444444;
+            font-size: 18px;
+        }
+        ol {
+            padding-left: 28px;
+            margin-bottom: 16px;
+            color: #444444;
+        }
+        ol li {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 17px;
+            overflow-x: auto;
+            margin: 15px 0 25px 0;
+            line-height: 1.6;
+        }
+        .flag-block {
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            word-break: break-all;
+            margin: 15px 0 20px 0;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 26px; }
+            h2 { font-size: 20px; }
+            p, ol li { font-size: 16px; }
+            .code-block, .flag-block { font-size: 15px; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回博客首页</a>
+
+        <h1>task21 Bugku CTF [这不是md5]解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>
+        分类: Crypto - Base16（十六进制）编码<br>
+        日期: 9月11日<br>
+        分值: 30分</p>
+
+        <h2>解题思路</h2>
+        <p>题目名称为 <code>这不是md5</code>，描述中给出了一串长度为 32 位的十六进制字符串：<code>666c61677b616537333538376261353662616566357d</code>。</p>
+        <p>乍一看长度很像 MD5 哈希值（32位），但题目明确提示“这不是md5”，这是典型的误导。观察字符串内容，全部由 <code>0-9</code> 和 <code>a-f</code> 组成，这实际上是 <b>Base16（十六进制）编码</b>。每两个十六进制字符代表一个 ASCII 字符，将其解码为文本即可得到 Flag。</p>
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>复制题目描述中给出的十六进制字符串：<code>666c61677b616537333538376261353662616566357d</code>。</li>
+            <li>打开 Bugku 在线工具箱，找到 <b>“Base16解码”</b> 或 <b>“Hex解码”</b> 工具。</li>
+            <li>将字符串粘贴到输入框中。</li>
+            <li>点击“解码”按钮。</li>
+            <li>下方输出结果即为 Flag：<code>flag{ae73587ba56baef5}</code>。</li>
+        </ol>
+
+        <h2>工具及操作说明</h2>
+        <div class="code-block">
+# 推荐直接使用 Bugku 平台自带在线工具：
+https://ctf.bugku.com/tool
+
+# 操作顺序（无需任何脚本，纯网页点击）：
+1. 复制题目描述中的十六进制字符串
+2. 在 Bugku 在线工具箱中，选择 "Base16解码" 或 "Hex解码"
+3. 粘贴字符串，点击解码
+4. 输出结果即为 Flag
+
+# 踩坑提示：
+不要被 32 位长度和题目名称误导去尝试 MD5 解密。MD5 是不可逆的，
+而这道题只是长得像 MD5 的十六进制 ASCII 编码。直接按 Base16 处理即可。
+        </div>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+flag{ae73587ba56baef5}
+        </div>
+    </div>
+</body>
+</html>
