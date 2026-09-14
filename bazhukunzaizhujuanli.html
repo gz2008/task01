@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task24 Bugku CTF [把猪困在猪圈里]解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background-color: #f5f5ff;
+            color: #333333;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .back-link {
+            display: inline-block;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a1a1a;
+            border-left: 5px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 30px;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin-top: 35px;
+            margin-bottom: 15px;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #444444;
+            font-size: 18px;
+        }
+        ol {
+            padding-left: 28px;
+            margin-bottom: 16px;
+            color: #444444;
+        }
+        ol li {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 17px;
+            overflow-x: auto;
+            margin: 15px 0 25px 0;
+            line-height: 1.6;
+        }
+        .flag-block {
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            word-break: break-all;
+            margin: 15px 0 20px 0;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 26px; }
+            h2 { font-size: 20px; }
+            p, ol li { font-size: 16px; }
+            .code-block, .flag-block { font-size: 15px; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回博客首页</a>
+
+        <h1>task24 Bugku CTF [把猪困在猪圈里]解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>
+        分类: Crypto - 猪圈密码 / Base64 图片<br>
+        日期: 9月14日<br>
+        分值: 15分</p>
+
+        <h2>解题思路</h2>
+        <p>题目名称为 <code>把猪困在猪圈里</code>，附件内容是一长串以 <code>/9j/</code> 开头的字符串。这是典型的 <b>Base64 编码的 JPEG 图片</b>（JPEG 图片的 Base64 编码通常以 <code>/9j/4AAQSkZJRg</code> 开头）。结合题目名称中的“猪圈”二字，可以确定这是 <b>猪圈密码（Pigpen Cipher）</b> 的题目。我们需要先将附件解码为图片，然后使用猪圈密码在线工具解密图片中的符号。</p>
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>下载附件，打开 <code>file (2).txt</code>，全选复制所有内容。</li>
+            <li>打开在线 Base64 转图片工具（如 <a href="https://base64.us/" target="_blank">Base64 Files</a>）。</li>
+            <li>将复制的 Base64 字符串粘贴到左侧输入框中。如果工具未自动识别格式，手动选择 <code>PNG - image/png</code> 或 <code>JPEG - image/jpeg</code>。</li>
+            <li>点击“预览图片”，工具会生成一张包含几何符号的图片（尺寸约 369×51 px）。将图片保存到本地。</li>
+            <li>打开猪圈密码在线解密工具：<a href="http://www.hiencode.com/pigpen.html" target="_blank">http://www.hiencode.com/pigpen.html</a>。</li>
+            <li>在工具页面中，对照图片上的符号，逐个点击对应的猪圈密码按钮，工具会实时输出对应的明文字母。</li>
+            <li>全部符号输入完毕后，得到明文 <code>thisispigpassword</code>，加上 <code>flag{}</code> 格式即为最终 Flag。</li>
+        </ol>
+
+        <h2>工具及操作说明</h2>
+        <div class="code-block">
+# 推荐操作方式（纯网页操作，无需脚本）：
+1. 复制附件中的 Base64 字符串
+2. 访问 https://base64.us/ 粘贴并预览，下载为 .png 图片
+3. 打开 http://www.hiencode.com/pigpen.html
+4. 对照图片符号，在工具中逐个点击对应的猪圈密码按钮
+5. 工具自动输出明文：thisispigpassword
+6. 提交 flag{thisispigpassword}
+
+# 猪圈密码简述：
+猪圈密码（Pigpen Cipher），又称共济会密码，是一种以格子为基础的
+图形替换密码。它使用两个井字格（无点/有点）和两个 X 形格
+（无点/有点）共 26 个符号来代表英文字母。
+
+# 常见变体注意：
+不同网站使用的猪圈密码变体可能略有差异。hiencode.com 的
+猪圈密码工具采用的是一种常见的变体，与本题图片符号完美匹配。
+        </div>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+flag{thisispigpassword}
+        </div>
+    </div>
+</body>
+</html>
