@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task26 Bugku CTF [备份是个好习惯]解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background-color: #f5f5ff;
+            color: #333333;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .back-link {
+            display: inline-block;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a1a1a;
+            border-left: 5px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 30px;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin-top: 35px;
+            margin-bottom: 15px;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #444444;
+            font-size: 18px;
+        }
+        ol {
+            padding-left: 28px;
+            margin-bottom: 16px;
+            color: #444444;
+        }
+        ol li {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 17px;
+            overflow-x: auto;
+            margin: 15px 0 25px 0;
+            line-height: 1.6;
+        }
+        .flag-block {
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            word-break: break-all;
+            margin: 15px 0 20px 0;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 26px; }
+            h2 { font-size: 20px; }
+            p, ol li { font-size: 16px; }
+            .code-block, .flag-block { font-size: 15px; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回博客首页</a>
+
+        <h1>task26 Bugku CTF [备份是个好习惯]解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>
+        分类: WEB - 源码泄露 / 变量覆盖绕过 / PHP 弱类型比较<br>
+        日期: 9月14日<br>
+        分值: 20分</p>
+
+        <h2>解题思路</h2>
+        <p>题目名称为 <code>备份是个好习惯</code>，直接暗示目标网站存在源码备份文件泄露。本题的解题链条为：</p>
+        <ol>
+            <li><b>源码泄露</b>：扫描并下载常见的备份文件（如 <code>index.php.bak</code>）。</li>
+            <li><b>代码审计</b>：分析源码发现使用了 <code>str_replace('key','',$str)</code> 对 URL 参数进行过滤，导致直接传参被破坏。</li>
+            <li><b>双写绕过</b>：利用双写构造 <code>kekeyy1</code>、<code>kekeyy2</code>，经过过滤后刚好还原为 <code>key1</code>、<code>key2</code> 变量。</li>
+            <li><b>MD5 弱类型碰撞</b>：传入两个 MD5 值均为 <code>0e</code> 开头的不同字符串，满足 <code>==</code> 弱比较但值不相等。</li>
+        </ol>
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>在题目页面点击“启动场景”，获取目标 URL（如：<code>http://160.202.254.160:16325</code>）。</li>
+            <li>尝试访问 <code>http://160.202.254.160:16325/index.php.bak</code>，成功下载到源码文件。</li>
+            <li>使用 <b>VS Code</b> 打开 <code>index.php.bak</code>，审计核心源码（截取关键逻辑）：
+                <div class="code-block">
+&lt;?php
+include_once "flag.php";
+ini_set("display_errors", 0);
+$str = strstr($_SERVER['REQUEST_URI'], '?');
+$str = substr($str,1);
+$str = str_replace('key','',$str);
+parse_str($str);
+echo md5($key1);
+echo md5($key2);
+if(md5($key1) == md5($key2) && $key1 !== $key2){
+    echo $flag."取得flag";
+}
+?&gt;
+                </div>
+            </li>
+            <li><b>代码审计要点</b>：
+                <ul>
+                    <li>第 13 行：<code>str_replace('key','',$str)</code> 会将 URL 参数中的 <code>key</code> 字符串全部替换为空。</li>
+                    <li>第 18 行：需满足 <code>md5($key1) == md5($key2)</code>（弱类型比较）且 <code>$key1 !== $key2</code>（值不全等）。</li>
+                </ul>
+            </li>
+            <li><b>构造绕过 Payload</b>：
+                <ul>
+                    <li>由于 <code>key</code> 会被过滤，直接传 <code>key1</code> 会变成 <code>1</code>，变量缺失。</li>
+                    <li>使用双写绕过：传入 <code>kekeyy1</code>，中间的 <code>key</code> 被删掉后剩下 <code>key1</code>，成功赋值。</li>
+                    <li>构造 MD5 0e 碰撞：传入 <code>kekeyy1=QNKCDZO</code> 和 <code>kekeyy2=240610708</code>。</li>
+                </ul>
+            </li>
+            <li>在浏览器地址栏输入最终的 payload：
+                <div class="code-block">
+http://160.202.254.160:16325/?kekeyy1=QNKCDZO&kekeyy2=240610708
+                </div>
+            </li>
+            <li>页面回显 <code>取得flag</code> 和真正的 flag，提交即可。</li>
+        </ol>
+
+        <h2>工具及操作说明</h2>
+        <div class="code-block">
+# 1. 下载源码：
+URL 后加 /index.php.bak 下载源码文件。
+推荐使用 VS Code 打开，PHP 语法高亮便于审计。
+
+# 2. 双写绕过原理：
+str_replace('key', '', 'kekeyy1') 的结果是 'key1'
+即：删除了中间的 'key'，剩余 'ke' + 'y1' = 'key1'
+
+# 3. MD5 0e 碰撞原理：
+QNKCDZO  -> md5 = 0e830400451993494058024219903391
+240610708 -> md5 = 0e462097431906509019562988736854
+两者在 == 弱比较时，会被当成 0 == 0 处理（科学计数法），
+但字符串本身严格不全等（!==），完美满足条件。
+        </div>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+访问上述 payload 后，页面回显的 flag{...} 即为最终答案
+        </div>
+    </div>
+</body>
+</html>
