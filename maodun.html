@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task23 Bugku CTF [矛盾]解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background-color: #f5f5ff;
+            color: #333333;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .back-link {
+            display: inline-block;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a1a1a;
+            border-left: 5px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 30px;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin-top: 35px;
+            margin-bottom: 15px;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #444444;
+            font-size: 18px;
+        }
+        ol {
+            padding-left: 28px;
+            margin-bottom: 16px;
+            color: #444444;
+        }
+        ol li {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 17px;
+            overflow-x: auto;
+            margin: 15px 0 25px 0;
+            line-height: 1.6;
+        }
+        .flag-block {
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            word-break: break-all;
+            margin: 15px 0 20px 0;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 26px; }
+            h2 { font-size: 20px; }
+            p, ol li { font-size: 16px; }
+            .code-block, .flag-block { font-size: 15px; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回博客首页</a>
+
+        <h1>task23 Bugku CTF [矛盾]解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>
+        分类: WEB - PHP 弱类型比较<br>
+        日期: 9月14日<br>
+        分值: 10分</p>
+
+        <h2>解题思路</h2>
+        <p>题目名称为 <code>矛盾</code>，点击“启动场景”后，页面给出了关键的 PHP 源码：</p>
+        <div class="code-block">
+$num=$_GET['num'];
+if(!is_numeric($num))
+{
+    echo $num;
+    if($num==1)
+    echo 'flag{**********}';
+}
+        </div>
+        <p>代码的逻辑是：通过 GET 方式接收参数 <code>num</code>。首先判断 <code>!is_numeric($num)</code>，也就是 <code>$num</code> 不能是数字或纯数字字符串。如果满足条件，则输出 <code>$num</code>，接着判断 <code>$num==1</code>，如果成立则输出 flag。</p>
+        <p><b>核心矛盾点：</b>一个值既不能是数字，又要等于数字 1。这利用的是 PHP 的<b>弱类型比较</b>特性。在 PHP 中，当字符串与数字进行 <code>==</code> 比较时，字符串会被强制转换为数字。如果字符串以数字开头，则转换时会截取前面的数字部分。例如字符串 <code>"1abc"</code> 与数字 <code>1</code> 比较时，<code>"1abc"</code> 会被转换为 <code>1</code>，因此 <code>1 == 1</code> 成立。同时，<code>is_numeric("1abc")</code> 会返回 <code>false</code>，因为它不是一个合法的数字字符串。这就完美绕过了两个条件。</p>
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>在题目页面点击“启动场景”，获取目标 URL（例如：<code>http://160.202.254.160:15134</code>）。</li>
+            <li>在 URL 后面构造 payload，传入参数 <code>num</code>。常用的 payload 有：<code>?num=1abc</code>、<code>?num=1%00</code> 或 <code>?num=1 or 1=1</code>。</li>
+            <li>在浏览器地址栏访问构造好的 URL，例如：<code>http://160.202.254.160:15134/?num=1abc</code>。</li>
+            <li>页面会先输出 <code>1abc</code>，随后输出 <code>flag{**********}</code>。</li>
+            <li>将输出的 flag 提交到平台即可。</li>
+        </ol>
+
+        <h2>工具及操作说明</h2>
+        <div class="code-block">
+# 推荐操作方式（纯浏览器操作，无需脚本）：
+1. 启动场景，获取目标 URL
+2. 在 URL 地址栏后追加 payload：
+   ?num=1abc
+   或者
+   ?num=1%00
+3. 回车访问，页面即可回显 flag
+
+# 原理说明：
+- is_numeric("1abc") 返回 false （绕过 !is_numeric）
+- "1abc" == 1 在 PHP 中为 true （利用弱类型转换，字符串转为数字1）
+- 同理 "1%00" == 1 也为 true
+
+# 拓展：如果是强类型比较（===），此方法无效。
+        </div>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+访问构造的 URL 后，页面回显的 flag{...} 即为最终答案
+        </div>
+    </div>
+</body>
+</html>
