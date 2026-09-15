@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task27 Bugku CTF [抄错的字符]解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background-color: #f5f5ff;
+            color: #333333;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .back-link {
+            display: inline-block;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a1a1a;
+            border-left: 5px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 30px;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin-top: 35px;
+            margin-bottom: 15px;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #444444;
+            font-size: 18px;
+        }
+        ol {
+            padding-left: 28px;
+            margin-bottom: 16px;
+            color: #444444;
+        }
+        ol li {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 17px;
+            overflow-x: auto;
+            margin: 15px 0 25px 0;
+            line-height: 1.6;
+        }
+        .flag-block {
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            word-break: break-all;
+            margin: 15px 0 20px 0;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 26px; }
+            h2 { font-size: 20px; }
+            p, ol li { font-size: 16px; }
+            .code-block, .flag-block { font-size: 15px; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回博客首页</a>
+
+        <h1>task27 Bugku CTF [抄错的字符]解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>
+        分类: Crypto - Base64 变形 / 暴力破解<br>
+        日期: 9月14日<br>
+        分值: 10分</p>
+
+        <h2>解题思路</h2>
+        <p>题目描述：<i>老师让小明抄写一段话，结果粗心的小明把部分数字抄成了字母，还因为强迫症把所有字母都换成大写。你能帮小明恢复并解开答案吗：QWIHBLGZZXJSXZNVBZW</i></p>
+        <p>密文 <code>QWIHBLGZZXJSXZNVBZW</code> 长度为 20，全是大写字母。结合“数字抄成字母”和“字母全大写”的线索，可以推断原始字符串是 <b>Base64 编码</b>。小明在抄写时：</p>
+        <ul>
+            <li>把数字抄成了形似的大写字母（如 0→O、1→I/L、2→Z、5→S、6→G、8→B 等）。</li>
+            <li>把所有小写字母强制转成了大写。</li>
+        </ul>
+        <p>因此，我们需要逆向还原：对密文中的每个字符，穷举它可能是的原始字符（大写本身、对应小写、或形似数字），然后进行 Base64 解码，筛选出包含 <code>flag{</code> 的结果。由于组合数量约 2600 万种，必须用脚本自动爆破。</p>
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>在 VS Code 中新建文件 <code>solve.py</code>，粘贴以下 Python 脚本：
+                <div class="code-block">
+import itertools
+import base64
+
+cipher = "QWIHBLGZZXJSXZNVBZW"
+
+# 每个字符可能的原始字符
+options = []
+for c in cipher:
+    opts = [c, c.lower()]  # 原始可能为大写或小写
+    # 数字被抄成形似字母的映射
+    if c == 'Z': opts.append('2')
+    if c == 'I': opts.append('1')
+    if c == 'B': opts.append('8')
+    if c == 'G': opts.append('6')
+    if c == 'S': opts.append('5')
+    if c == 'L': opts.append('1')
+    if c == 'O': opts.append('0')
+    if c == 'E': opts.append('3')
+    if c == 'A': opts.append('4')
+    if c == 'T': opts.append('7')
+    options.append(list(set(opts)))
+
+# 遍历所有组合
+for combo in itertools.product(*options):
+    s = ''.join(combo)
+    # 补全 Base64 等号（长度 20 是 4 的倍数，无需补）
+    try:
+        decoded = base64.b64decode(s).decode('utf-8')
+        if 'flag{' in decoded:
+            print(f"[+] 找到: {s}")
+            print(f"[+] 解码: {decoded}")
+            break
+    except Exception:
+        pass
+                </div>
+            </li>
+            <li>在 VS Code 中打开终端（Terminal），运行：
+                <div class="code-block">
+python solve.py
+                </div>
+            </li>
+            <li>脚本会自动遍历所有可能的大小写和数字替换组合，进行 Base64 解码。稍等片刻即可在终端看到包含 <code>flag{...}</code> 的结果。</li>
+            <li>将输出的 flag 提交到 Bugku 平台即可。</li>
+        </ol>
+
+        <h2>工具及操作说明</h2>
+        <div class="code-block">
+# 运行环境：Python 3.x，无需安装额外库
+# 操作流程：
+1. 在 VS Code 中新建 solve.py，粘贴上述代码
+2. 打开终端，执行 python solve.py
+3. 终端输出即为最终 flag
+        </div>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+运行脚本后，终端输出的 flag{...} 即为最终答案
+        </div>
+    </div>
+</body>
+</html>
