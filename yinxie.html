@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task28 Bugku CTF [隐写]解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background-color: #f5f5ff;
+            color: #333333;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .back-link {
+            display: inline-block;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a1a1a;
+            border-left: 5px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 30px;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin-top: 35px;
+            margin-bottom: 15px;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #444444;
+            font-size: 18px;
+        }
+        ol {
+            padding-left: 28px;
+            margin-bottom: 16px;
+            color: #444444;
+        }
+        ol li {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 17px;
+            overflow-x: auto;
+            margin: 15px 0 25px 0;
+            line-height: 1.6;
+        }
+        .flag-block {
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            word-break: break-all;
+            margin: 15px 0 20px 0;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 26px; }
+            h2 { font-size: 20px; }
+            p, ol li { font-size: 16px; }
+            .code-block, .flag-block { font-size: 15px; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回博客首页</a>
+
+        <h1>task28 Bugku CTF [隐写]解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>
+        分类: MISC - PNG 图片隐写<br>
+        日期: 9月15日<br>
+        分值: 10分</p>
+
+        <h2>解题思路</h2>
+        <p>题目名称为 <code>隐写</code>，提示 flag 格式为 <code>BUGKU{xxxx}</code>。附件为图片文件，但打开后发现图片显示异常（或显示不全，下方有大量空白/被截断）。这是典型的 <b>PNG 图片 IHDR 宽高被篡改</b> 的隐写手段。</p>
+        <p>PNG 图片的 <code>IHDR</code> 数据块中记录了图片的宽度和高度。如果攻击者修改了高度（通常是改小），下方的图像内容就会被隐藏。同时，由于改变了数据，IHDR 的 CRC 校验码也会随之报错。我们需要修复这些参数，让隐藏的图片部分显现出来。</p>
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>下载附件，发现是一张无法正常打开或显示不全的 PNG 图片。</li>
+            <li>判断为 PNG 宽高被修改。使用在线工具进行检测和修复：
+                <div class="code-block">
+https://tools.qsnctf.com/#//misc/png_dim_fix
+                </div>
+            </li>
+            <li>打开工具后，将异常的 PNG 图片上传。</li>
+            <li>该工具会自动检测 PNG 文件的 IHDR 块，通过重新计算 CRC 或爆破正确的高度值，修复图片的宽度、高度和 IHDR CRC。</li>
+            <li>修复成功后，下载修复后的图片。</li>
+            <li>用图片查看器打开修复后的图片，隐藏的图片部分会显示出来，里面包含最终的 Flag。</li>
+        </ol>
+
+        <h2>工具及操作说明</h2>
+        <div class="code-block">
+# 推荐在线工具（无需安装任何软件，直接网页操作）：
+https://tools.qsnctf.com/#//misc/png_dim_fix
+
+# 操作顺序：
+1. 上传显示异常的 PNG 图片
+2. 点击“检测并修复”按钮
+3. 工具自动修复 IHDR 宽高和 CRC 校验码
+4. 下载修复后的图片，查看隐藏内容
+
+# 原理说明：
+- PNG 文件头部 IHDR 块包含 4 字节宽度和 4 字节高度
+- 修改高度可以隐藏图片下方的内容
+- 修改宽高后，IHDR 的 CRC 校验值会对不上，导致图片无法正常显示
+- 修复工具通过重新计算或爆破，还原真实的宽高并修正 CRC，让隐藏内容显示出来
+        </div>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+使用工具修复图片后，查看图片中显示的 BUGKU{xxxx} 即为最终答案
+        </div>
+    </div>
+</body>
+</html>
