@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>task30 Bugku CTF [眼见非实]解题WriteUp</title>
+    <style>
+        /* 完全复用你之前统一的页面样式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background-color: #f5f5ff;
+            color: #333333;
+            line-height: 1.7;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .back-link {
+            display: inline-block;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1a1a1a;
+            border-left: 5px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 30px;
+            margin-top: 0;
+            line-height: 1.3;
+        }
+        h2 {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+            margin-top: 35px;
+            margin-bottom: 15px;
+        }
+        p {
+            margin-bottom: 16px;
+            color: #444444;
+            font-size: 18px;
+        }
+        ol {
+            padding-left: 28px;
+            margin-bottom: 16px;
+            color: #444444;
+        }
+        ol li {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 17px;
+            overflow-x: auto;
+            margin: 15px 0 25px 0;
+            line-height: 1.6;
+        }
+        .flag-block {
+            background-color: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            word-break: break-all;
+            margin: 15px 0 20px 0;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            h1 { font-size: 26px; }
+            h2 { font-size: 20px; }
+            p, ol li { font-size: 16px; }
+            .code-block, .flag-block { font-size: 15px; padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回博客首页</a>
+
+        <h1>task30 Bugku CTF [眼见非实]解题WriteUp</h1>
+
+        <h2>题目信息</h2>
+        <p>平台: Bugku CTF<br>
+        分类: MISC - Office文档隐写 / 文件伪装<br>
+        日期: 9月15日<br>
+        分值: 10分</p>
+
+        <h2>解题思路</h2>
+        <p>题目名称为 <code>眼见非实</code>，附件名为 <code>眼见非实.docx</code>。在 CTF 中，Office 文档（.docx、.xlsx、.pptx）的本质是一个 <b>ZIP 压缩包</b>。</p>
+        <p><b>核心原理：</b>Word 文档的本质就是 ZIP。微软的 Office 系列文件（.docx、.xlsx、.pptx）在底层使用的是 Open XML 格式，本质上就是一个 ZIP 压缩包。里面打包了排版信息、文字内容（XML）和图片资源。所以只要把 .docx 改成 .zip，解压出来一定是一个包含 word、docProps 等目录的文件夹。</p>
+        <p>“眼见非实”这个题目名暗示我们，不能被文件表面的 .docx 后缀所迷惑，必须去探究它底层 ZIP 格式中隐藏的内容。</p>
+
+        <h2>详细步骤</h2>
+        <ol>
+            <li>下载附件 <code>眼见非实.docx</code>。</li>
+            <li>右键文件重命名为 <code>眼见非实.zip</code>（系统提示是否修改扩展名，点击“是”）。</li>
+            <li>使用 WinRAR 或 7-Zip 解压该 ZIP 文件，得到一个包含 <code>_rels</code>、<code>customXml</code>、<code>docProps</code>、<code>word</code> 等目录的文件夹。</li>
+            <li>用 <b>VS Code</b> 打开这个解压出的文件夹。</li>
+            <li>按下 <code>Ctrl + Shift + F</code> 进行全局搜索，输入 <code>flag{</code>。</li>
+            <li>VS Code 会列出所有匹配的文件和行，直接点击定位并复制完整的 flag 内容。</li>
+            <li>如果搜索不到，可以进入 <code>word</code> 文件夹查看 <code>document.xml</code>（正文），或进入 <code>word/media/</code> 查看图片是否存在隐写。</li>
+        </ol>
+
+        <h2>工具及操作说明</h2>
+        <div class="code-block">
+# 操作流程（无需下载额外软件）：
+1. 将 .docx 后缀改为 .zip
+2. 解压 ZIP 文件
+3. 用 VS Code 打开解压目录，Ctrl+Shift+F 搜 "flag{"
+
+# 备用方案（使用 Git Bash 命令行）：
+在文件目录右键打开 Git Bash，依次执行：
+mv 眼见非实.docx 眼见非实.zip
+unzip 眼见非实.zip
+grep -r "flag{" .
+# grep 命令会直接输出所有包含 flag 的匹配行，极其方便。
+
+# 如何判断文件是否伪装？
+在 Git Bash 中输入 `file 文件名`，查看真实类型。
+或者直接用 VS Code 打开文件，若开头看到 "PK" 字符，即为 ZIP 压缩包。
+        </div>
+
+        <h2>最终Flag</h2>
+        <div class="flag-block">
+flag{请填入你实际提取出来的flag内容}
+        </div>
+    </div>
+</body>
+</html>
