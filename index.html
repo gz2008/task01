@@ -21,7 +21,6 @@
             min-height: 100vh;
             padding: 30px 20px;
             line-height: 1.6;
-            /* 页面淡入加载效果 */
             animation: pageFadeIn 0.6s ease-out;
         }
 
@@ -30,7 +29,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* 主容器，模拟卡片 */
+        /* 主容器 */
         .container {
             max-width: 680px;
             width: 100%;
@@ -64,9 +63,54 @@
             border-radius: 4px;
         }
 
+        /* 并列分类导航 (Tab按钮) */
+        .tab-nav {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            margin-bottom: 25px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 16px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #64748b;
+            background: #f8fafc;
+            border: 2px solid #eef2f6;
+            border-radius: 16px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .tab-btn:hover {
+            background: #ffffff;
+            border-color: #b9c7da;
+            color: #3b82f6;
+        }
+        /* 激活状态 */
+        .tab-btn.active {
+            background: #3b82f6;
+            color: #ffffff;
+            border-color: #3b82f6;
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+        }
+
+        /* 分类内容区 */
+        .tab-content {
+            display: none; /* 默认隐藏 */
+            animation: fadeIn 0.4s ease;
+        }
+        .tab-content.active {
+            display: block; /* 激活时显示 */
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         /* 文章列表 */
         .post-list {
-            margin-top: 28px;
             list-style: none;
         }
         .post-list li {
@@ -76,7 +120,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 1.45rem;
+            font-size: 1.15rem;
             font-weight: 500;
             color: #1e293b;
             text-decoration: none;
@@ -93,33 +137,32 @@
             transform: translateX(4px);
             color: #2563eb;
         }
-        /* 文章标题样式 */
         .post-title {
             display: inline-block;
             flex: 1;
+            padding-right: 12px;
         }
-        /* 发布时间样式 */
         .post-date {
             font-size: 0.95rem;
             color: #94a3b8;
             font-weight: 400;
-            margin-right: 12px;
+            white-space: nowrap;
             transition: color 0.25s ease;
         }
         .post-list a:hover .post-date {
             color: #64748b;
         }
-        /* 导航箭头点缀 */
         .post-list a::after {
             content: '→';
             opacity: 0.3;
             transition: opacity 0.2s;
+            margin-left: 10px;
         }
         .post-list a:hover::after {
             opacity: 0.8;
         }
 
-        /* 底部极简信息 */
+        /* 底部 */
         .footer {
             margin-top: 40px;
             padding-top: 20px;
@@ -133,7 +176,8 @@
         @media (max-width: 500px) {
             .container { padding: 30px 20px; }
             .blog-title { font-size: 2.2rem; }
-            .post-list a { font-size: 1.2rem; padding: 14px 16px; }
+            .tab-btn { font-size: 1rem; padding: 12px; }
+            .post-list a { font-size: 1rem; padding: 14px 16px; }
             .post-date { font-size: 0.8rem; }
         }
     </style>
@@ -141,196 +185,83 @@
 <body>
     <div class="container">
         <h1 class="blog-title">gz2008的技术博客</h1>
-        <ul class="post-list">
-            <li>
-                <a href="blog.html">
-                    <span class="post-title">task01 我的第一篇博客</span>
-                    <span class="post-date">2026-09-08</span>
-                </a>
-            </li>
-            <li>
-    <a href="huaji.html">
-        <span class="post-title">task02 Bugku CTF 滑稽题解题Writeup</span>
-        <span class="post-date">2026-09-09</span>
-    </a>
-</li>
- <li>
-    <a href="jisuanqi.html">
-        <span class="post-title">task03 Bugku CTF 计算器题解题Writeup</span>
-        <span class="post-date">2026-09-09</span>
-    </a>
-</li>
- <li>
-    <a href="alert.html">
-        <span class="post-title">task04 Bugku CTF alert题解题Writeup</span>
-        <span class="post-date">2026-09-09</span>
-    </a>
-</li> 
- <li>
-    <a href="rangtatingxialai.html">
-        <span class="post-title">task05 Bugku CTF 你必须让他停下来题解题Writeup</span>
-        <span class="post-date">2026-09-10</span>
-    </a>
-</li>
-    <li>
-    <a href="toudengcang.html">
-        <span class="post-title">task06 Bugku CTF 头等舱题解题Writeup</span>
-        <span class="post-date">2026-09-10</span>
-    </a>
-</li> 
-     <li>
-    <a href="get.html">
-        <span class="post-title">task07 Bugku CTF get题解题Writeup</span>
-        <span class="post-date">2026-09-10</span>
-    </a>
-</li>
- <li>
-    <a href="Post.html">
-        <span class="post-title">task08 Bugku CTF Post题解题Writeup</span>
-        <span class="post-date">2026-09-10</span>
-    </a>
-</li>            
- <li>
-    <a href="source.html">
-        <span class="post-title">task09 Bugku CTF source题解题Writeup</span>
-        <span class="post-date">2026-09-11</span>
-    </a>
-</li> 
- <li>
-    <a href="ruishijundao.html">
-        <span class="post-title">task10 Bugku CTF 瑞士军刀题解题Writeup</span>
-        <span class="post-date">2026-09-11</span>
-    </a>
-</li> 
-  <li>
-    <a href="danchuntupian.html">
-        <span class="post-title">task11 Bugku CTF 这是一张单纯的图片题解题Writeup</span>
-        <span class="post-date">2026-09-11</span>
-    </a>
-</li> 
- <li>
-    <a href="mosimima.html">
-        <span class="post-title">task12 Bugku CTF 摩斯密码题解题Writeup</span>
-        <span class="post-date">2026-09-12</span>
-    </a>
-</li> 
- <li>
-    <a href="congmingdexiaoyang.html">
-        <span class="post-title">task13 Bugku CTF 聪明的小羊题解题Writeup</span>
-        <span class="post-date">2026-09-13</span>
-    </a>
-</li> 
-  <li>
-    <a href="okk.html">
-        <span class="post-title">task14 Bugku CTF okk题解题Writeup</span>
-        <span class="post-date">2026-09-13</span>
-    </a>
-</li> 
-  <li>
-    <a href="[+-<>].html">
-        <span class="post-title">task15 Bugku CTF [+-<>]题解题Writeup</span>
-        <span class="post-date">2026-09-13</span>
-    </a>
-</li> 
-  <li>
-    <a href="rumennixiang.html">
-        <span class="post-title">task16 Bugku CTF 入门逆向题解题Writeup</span>
-        <span class="post-date">2026-09-13</span>
-    </a>
-</li>
-<li>
-    <a href="linux.html">
-        <span class="post-title">task17 Bugku CTF linux题解题Writeup</span>
-        <span class="post-date">2026-09-13</span>
-    </a>
-</li>
-     <a href="hexinjiazhiguan.html">
-        <span class="post-title">task18 Bugku CTF 核心价值观题解题Writeup</span>
-        <span class="post-date">2026-09-14</span>
-    </a>
-</li>
- </li>
-     <a href="sanluandemiwen.html">
-        <span class="post-title">task19 Bugku CTF 散乱的密文题解题Writeup</span>
-        <span class="post-date">2026-09-14</span>
-    </a>
-</li>
-</li>
-     <a href="short ook.html">
-        <span class="post-title">task20 Bugku CTF short ook题解题Writeup</span>
-        <span class="post-date">2026-09-14</span>
-    </a>
-</li>
-</li>
-     <a href="zhebushimd5.html">
-        <span class="post-title">task21 Bugku CTF 这不是md5题解题Writeup</span>
-        <span class="post-date">2026-09-14</span>
-    </a>
-</li>
-</li>
-     <a href="beisijiazu.html">
-        <span class="post-title">task22 Bugku CTF 贝斯家族题解题Writeup</span>
-        <span class="post-date">2026-09-14</span>
-    </a>
-</li>
-</li>
-     <a href="maodun.html">
-        <span class="post-title">task23 Bugku CTF 矛盾题解题Writeup</span>
-        <span class="post-date">2026-09-14</span>
-    </a>
-</li>
-  </li>
-     <a href="bazhukunzaizhujuanli.html">
-        <span class="post-title">task24 Bugku CTF 把猪困在猪圈里题解题Writeup</span>
-        <span class="post-date">2026-09-14</span>
-    </a>
-</li>
-  </li>
-     <a href="huangdaoshiergong.html">
-        <span class="post-title">task25 Bugku CTF 黄道十二宫题解题Writeup</span>
-        <span class="post-date">2026-09-14</span>
-    </a>
-</li>
- </li>
-     <a href="huangdaoshiergong.html">
-        <span class="post-title">task25 Bugku CTF 黄道十二宫题解题Writeup</span>
-        <span class="post-date">2026-09-14</span>
-    </a>
-</li> 
- </li>
-     <a href="beifenshigehaodongxi.html">
-        <span class="post-title">task26 Bugku CTF 备份是个好东西题解题Writeup</span>
-        <span class="post-date">2026-09-14</span>
-    </a>
-</li>
-</li>
-     <a href="chaocuodezifu.html">
-        <span class="post-title">task27 Bugku CTF 抄错的字符题解题Writeup</span>
-        <span class="post-date">2026-09-15</span>
-    </a>
-</li>
-</li>
-     <a href="yinxie.html">
-        <span class="post-title">task28 Bugku CTF 隐写题解题Writeup</span>
-        <span class="post-date">2026-09-15</span>
-    </a>
-</li>
-</li>
-     <a href="telnet.html">
-        <span class="post-title">task29 Bugku CTF telnet题解题Writeup</span>
-        <span class="post-date">2026-09-15</span>
-    </a>
-</li>
- </li>
-     <a href="yanjianfeishi.html">
-        <span class="post-title">task30 Bugku CTF 眼见非实题解题Writeup</span>
-        <span class="post-date">2026-09-15</span>
-    </a>
-</li>
-            <!-- 后续新增文章直接复制上面的li块，修改标题和日期即可 -->
-        </ul>
+
+        <!-- 并列分类导航 -->
+        <div class="tab-nav">
+            <div class="tab-btn active" onclick="switchTab('bugku')">📚 Bugku (30/30)</div>
+            <div class="tab-btn" onclick="switchTab('ctfhub')">🚀 CTFHub (1/50)</div>
+        </div>
+
+        <!-- Bugku 题目列表 -->
+        <div id="bugku" class="tab-content active">
+            <ul class="post-list">
+                <li><a href="blog.html"><span class="post-title">task01 我的第一篇博客</span><span class="post-date">2026-09-08</span></a></li>
+                <li><a href="huaji.html"><span class="post-title">task02 Bugku CTF 滑稽题解题Writeup</span><span class="post-date">2026-09-09</span></a></li>
+                <li><a href="jisuanqi.html"><span class="post-title">task03 Bugku CTF 计算器题解题Writeup</span><span class="post-date">2026-09-09</span></a></li>
+                <li><a href="alert.html"><span class="post-title">task04 Bugku CTF alert题解题Writeup</span><span class="post-date">2026-09-09</span></a></li> 
+                <li><a href="rangtatingxialai.html"><span class="post-title">task05 Bugku CTF 你必须让他停下来题解题Writeup</span><span class="post-date">2026-09-10</span></a></li>
+                <li><a href="toudengcang.html"><span class="post-title">task06 Bugku CTF 头等舱题解题Writeup</span><span class="post-date">2026-09-10</span></a></li> 
+                <li><a href="get.html"><span class="post-title">task07 Bugku CTF get题解题Writeup</span><span class="post-date">2026-09-10</span></a></li>
+                <li><a href="Post.html"><span class="post-title">task08 Bugku CTF Post题解题Writeup</span><span class="post-date">2026-09-10</span></a></li>            
+                <li><a href="source.html"><span class="post-title">task09 Bugku CTF source题解题Writeup</span><span class="post-date">2026-09-11</span></a></li> 
+                <li><a href="ruishijundao.html"><span class="post-title">task10 Bugku CTF 瑞士军刀题解题Writeup</span><span class="post-date">2026-09-11</span></a></li> 
+                <li><a href="danchuntupian.html"><span class="post-title">task11 Bugku CTF 这是一张单纯的图片题解题Writeup</span><span class="post-date">2026-09-11</span></a></li> 
+                <li><a href="mosimima.html"><span class="post-title">task12 Bugku CTF 摩斯密码题解题Writeup</span><span class="post-date">2026-09-12</span></a></li> 
+                <li><a href="congmingdexiaoyang.html"><span class="post-title">task13 Bugku CTF 聪明的小羊题解题Writeup</span><span class="post-date">2026-09-13</span></a></li> 
+                <li><a href="okk.html"><span class="post-title">task14 Bugku CTF okk题解题Writeup</span><span class="post-date">2026-09-13</span></a></li> 
+                <li><a href="[+-<>].html"><span class="post-title">task15 Bugku CTF [+-<>]题解题Writeup</span><span class="post-date">2026-09-13</span></a></li> 
+                <li><a href="rumennixiang.html"><span class="post-title">task16 Bugku CTF 入门逆向题解题Writeup</span><span class="post-date">2026-09-13</span></a></li>
+                <li><a href="linux.html"><span class="post-title">task17 Bugku CTF linux题解题Writeup</span><span class="post-date">2026-09-13</span></a></li>
+                <li><a href="hexinjiazhiguan.html"><span class="post-title">task18 Bugku CTF 核心价值观题解题Writeup</span><span class="post-date">2026-09-14</span></a></li>
+                <li><a href="sanluandemiwen.html"><span class="post-title">task19 Bugku CTF 散乱的密文题解题Writeup</span><span class="post-date">2026-09-14</span></a></li>
+                <li><a href="short ook.html"><span class="post-title">task20 Bugku CTF short ook题解题Writeup</span><span class="post-date">2026-09-14</span></a></li>
+                <li><a href="zhebushimd5.html"><span class="post-title">task21 Bugku CTF 这不是md5题解题Writeup</span><span class="post-date">2026-09-14</span></a></li>
+                <li><a href="beisijiazu.html"><span class="post-title">task22 Bugku CTF 贝斯家族题解题Writeup</span><span class="post-date">2026-09-14</span></a></li>
+                <li><a href="maodun.html"><span class="post-title">task23 Bugku CTF 矛盾题解题Writeup</span><span class="post-date">2026-09-14</span></a></li>
+                <li><a href="bazhukunzaizhujuanli.html"><span class="post-title">task24 Bugku CTF 把猪困在猪圈里题解题Writeup</span><span class="post-date">2026-09-14</span></a></li>
+                <li><a href="huangdaoshiergong.html"><span class="post-title">task25 Bugku CTF 黄道十二宫题解题Writeup</span><span class="post-date">2026-09-14</span></a></li> 
+                <li><a href="beifenshigehaodongxi.html"><span class="post-title">task26 Bugku CTF 备份是个好东西题解题Writeup</span><span class="post-date">2026-09-14</span></a></li>
+                <li><a href="chaocuodezifu.html"><span class="post-title">task27 Bugku CTF 抄错的字符题解题Writeup</span><span class="post-date">2026-09-15</span></a></li>
+                <li><a href="yinxie.html"><span class="post-title">task28 Bugku CTF 隐写题解题Writeup</span><span class="post-date">2026-09-15</span></a></li>
+                <li><a href="telnet.html"><span class="post-title">task29 Bugku CTF telnet题解题Writeup</span><span class="post-date">2026-09-15</span></a></li>
+                <li><a href="yanjianfeishi.html"><span class="post-title">task30 Bugku CTF 眼见非实题解题Writeup</span><span class="post-date">2026-09-15</span></a></li>
+            </ul>
+        </div>
+
+        <!-- CTFHub 题目列表 -->
+        <div id="ctfhub" class="tab-content">
+            <ul class="post-list">
+                <!-- 记得新建 ctfhub_mysql_liuliang.html 这个文件 -->
+                <li><a href="ctfhub_mysql_liuliang.html"><span class="post-title">task01 CTFHub Misc MySQL流量题解题Writeup</span><span class="post-date">2026-09-16</span></a></li>
+                <!-- 后续新增的 CTFHub 文章，直接复制上面这个 li 块 -->
+            </ul>
+        </div>
+
         <div class="footer">© 2026 · 用 ❤️ 记录</div>
     </div>
+
+    <!-- 切换分类的 JS 脚本 -->
+    <script>
+        function switchTab(tabId) {
+            // 1. 隐藏所有内容区块
+            var contents = document.querySelectorAll('.tab-content');
+            contents.forEach(function(content) {
+                content.classList.remove('active');
+            });
+
+            // 2. 移除所有按钮的激活状态
+            var buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(function(btn) {
+                btn.classList.remove('active');
+            });
+
+            // 3. 显示当前点击的内容区块
+            document.getElementById(tabId).classList.add('active');
+
+            // 4. 激活当前点击的按钮
+            event.currentTarget.classList.add('active');
+        }
+    </script>
 </body>
 </html>
 
