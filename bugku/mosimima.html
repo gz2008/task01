@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task11 Bugku CTF 这是一张单纯的图片解题WriteUp</title>
+    <title>task12 Bugku CTF /. - 解题WriteUp</title>
     <style>
         /* 完全复用你之前统一的页面样式 */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; background-color: #f5f5ff; color: #333333; line-height: 1.7; padding: 20px; max-width: 900px; margin: 0 auto; }
@@ -22,30 +22,36 @@
 </head>
 <body>
     <div class="container">
-        <a href="index.html " class="back-link">← 返回博客首页</a >
+        <a href="index.html" class="back-link">← 返回博客首页</a>
 
-        <h1>task11 Bugku CTF 这是一张单纯的图片解题WriteUp</h1>
+        <h1>task12 Bugku CTF /. - 解题WriteUp</h1>
 
         <h2>题目信息</h2>
-        <p>平台: Bugku CTF<br>分类: MISC - 图片隐写<br>日期: 9月11日<br>分值: 10分</p >
+        <p>平台: Bugku CTF<br>分类: Crypto - 摩斯密码<br>日期: 9月11日<br>分值: 10分</p >
 
         <h2>解题思路</h2>
-        <p>题目名为“这是一张单纯的图片”，描述给出了提示 <code>key{}</code>。下载图片后直接用记事本搜索 <code>key</code> 找不到明文，说明使用了编码。我们使用记事本打开图片，按 <code>Ctrl+End</code> 跳转到文件末尾，发现了一串 <b>HTML 实体编码</b>（类似 <code>&#107;&#101;...</code>）。</p >
-        <p><b>解题技巧：</b>利用浏览器天生支持渲染 HTML 的特性，直接将图片文件的后缀名从 <code>.jpg</code> 修改为 <code>.html</code>，然后用浏览器打开。浏览器会自动将实体编码解析为人类可读的明文，直接获取 Flag。</p >
+        <p>题目名称为 <code>/. -</code>，给出的密文由大量的 <code>.</code>（点）、<code>-</code>（横线）和 <code>/</code>（分隔符）组成，这是非常典型的 <b>摩尔斯电码（Morse Code）</b>。</p >
+        <p><b>解题技巧（防套路警告）：</b>这道题是一道经典的“防自动化脚本”坑题。直接摩斯解码后得到的字符串为 <code>FLAG9MD3FCBF17F93995040A</code>。但仔细观察会发现三个严重的干扰项：</p >
+        <ol>
+            <li>开头的 <code>FLAG</code> 是伪装的前缀，并非有效载荷。</li>
+            <li>中间的 <code>9M</code> 中，<code>M</code> 不是合法的十六进制字符（十六进制只有 0-9 和 A-F），这是出题人故意留下的陷阱或笔误。</li>
+            <li>结尾的 <code>0A</code> 同样是多余的后缀干扰。</li>
+        </ol>
+        <p>因此，我们需要人工剔除干扰项，提取出中间看起来像 MD5 哈希值（16位十六进制）的核心部分 <code>D3FCBF17F9399504</code>。最后结合评论区提示“全部变成小写字母”，得到最终答案。</p >
 
         <h2>详细步骤</h2>
         <ol>
-            <li>下载图片，右键用“记事本”打开。</li>
-            <li>按 <code>Ctrl+End</code> 跳到文件最末尾，发现编码：<br>
-            <code>&#107;&#101;&#121;&#123;&#49;&#50;&#51;&#95;&#119;&#117;&#32;&#97;&#114;&#101;&#32;&#115;&#111;&#32;&#99;&#117;&#116;&#101;&#125;</code></li>
-            <li>右键图片，选择“重命名”，将后缀 <code>.jpg</code> 改为 <code>.html</code>。</li>
-            <li>双击用浏览器打开这个 HTML 文件，浏览器自动将编码解析为：<code>key{123_wu are so cute}</code>。</li>
-            <li>复制该字符串并提交。若平台禁止空格，则将空格替换为下划线后提交：<code>key{123_wu_are_so_cute}</code>。</li>
+            <li>复制题目描述中的摩斯密码密文。</li>
+            <li>打开在线摩斯密码解码工具（如 Bugku 工具库或土薯在线工具），将密文粘贴进去进行解码。</li>
+            <li>得到初始解码结果：<code>FLAG9MD3FCBF17F93995040A</code>。</li>
+            <li>分析结果，弃掉开头的 <code>FLAG</code> 前缀、中间无法转换的 <code>9M</code> 乱码、以及结尾的 <code>0A</code> 后缀。</li>
+            <li>提取出纯粹的有效载荷：<code>D3FCBF17F9399504</code>。</li>
+            <li>将该字符串全部转换为小写：<code>d3fcbf17f9399504</code>，并加上大括号提交。</li>
         </ol>
 
         <h2>最终Flag</h2>
         <div class="flag-block">
-key{123_wu_are_so_cute}
+{d3fcbf17f9399504}
         </div>
     </div>
 </body>

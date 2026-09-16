@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bugku CTF Writeups</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 34px 20px 60px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      color: #172033;
+      background: #f5f8fc;
+      line-height: 1.6;
+    }
+    .container { width: min(840px, 100%); margin: 0 auto; }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    header { margin: 28px 0; }
+    h1 { margin: 0 0 8px; font-size: clamp(2rem, 6vw, 3rem); }
+    .subtitle { margin: 0; color: #64748b; }
+    .post-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+    .post-list a {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 17px 20px;
+      color: #172033;
+      text-decoration: none;
+      background: #ffffff;
+      border: 1px solid #e5ebf3;
+      border-radius: 14px;
+      box-shadow: 0 5px 18px rgba(43, 74, 125, 0.05);
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .post-list a:hover {
+      transform: translateX(5px);
+      color: #1d4ed8;
+      border-color: #9bbaf7;
+      box-shadow: 0 8px 24px rgba(43, 74, 125, 0.1);
+    }
+    .post-title { font-weight: 600; }
+    .post-date { flex: 0 0 auto; color: #94a3b8; font-size: 0.9rem; }
+    @media (max-width: 560px) {
+      .post-list a { align-items: flex-start; flex-direction: column; gap: 5px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="../index.html">← 返回总入口</a>
+    <header>
+      <h1>Bugku CTF</h1>
+      <p class="subtitle">共 30 篇解题记录</p>
+    </header>
+    <ul class="post-list">
+      <li><a href="blog.html"><span class="post-title">task01 我的第一篇博客</span><span class="post-date">2026-09-08</span></a></li>
+      <li><a href="huaji.html"><span class="post-title">task02 Bugku CTF 滑稽题</span><span class="post-date">2026-09-09</span></a></li>
+      <li><a href="jisuanqi.html"><span class="post-title">task03 Bugku CTF 计算器</span><span class="post-date">2026-09-09</span></a></li>
+      <li><a href="alert.html"><span class="post-title">task04 Bugku CTF alert</span><span class="post-date">2026-09-09</span></a></li>
+      <li><a href="rangtatingxialai.html"><span class="post-title">task05 Bugku CTF 你必须让他停下来</span><span class="post-date">2026-09-10</span></a></li>
+      <li><a href="toudengcang.html"><span class="post-title">task06 Bugku CTF 头等舱</span><span class="post-date">2026-09-10</span></a></li>
+      <li><a href="get.html"><span class="post-title">task07 Bugku CTF GET</span><span class="post-date">2026-09-10</span></a></li>
+      <li><a href="Post.html"><span class="post-title">task08 Bugku CTF POST</span><span class="post-date">2026-09-10</span></a></li>
+      <li><a href="source.html"><span class="post-title">task09 Bugku CTF source</span><span class="post-date">2026-09-11</span></a></li>
+      <li><a href="ruishijundao.html"><span class="post-title">task10 Bugku CTF 瑞士军刀</span><span class="post-date">2026-09-11</span></a></li>
+      <li><a href="danchuntupian.html"><span class="post-title">task11 Bugku CTF 这是一张单纯的图片</span><span class="post-date">2026-09-11</span></a></li>
+      <li><a href="mosimima.html"><span class="post-title">task12 Bugku CTF 摩斯密码</span><span class="post-date">2026-09-12</span></a></li>
+      <li><a href="congmingdexiaoyang.html"><span class="post-title">task13 Bugku CTF 聪明的小羊</span><span class="post-date">2026-09-13</span></a></li>
+      <li><a href="okk.html"><span class="post-title">task14 Bugku CTF okk</span><span class="post-date">2026-09-13</span></a></li>
+      <li><a href="brainfuck.html"><span class="post-title">task15 Bugku CTF [+-&lt;&gt;]</span><span class="post-date">2026-09-13</span></a></li>
+      <li><a href="rumennixiang.html"><span class="post-title">task16 Bugku CTF 入门逆向</span><span class="post-date">2026-09-13</span></a></li>
+      <li><a href="linux.html"><span class="post-title">task17 Bugku CTF linux</span><span class="post-date">2026-09-13</span></a></li>
+      <li><a href="hexinjiazhiguan.html"><span class="post-title">task18 Bugku CTF 核心价值观</span><span class="post-date">2026-09-14</span></a></li>
+      <li><a href="sanluandemiwen.html"><span class="post-title">task19 Bugku CTF 散乱的密文</span><span class="post-date">2026-09-14</span></a></li>
+      <li><a href="short ook.html"><span class="post-title">task20 Bugku CTF short ook</span><span class="post-date">2026-09-14</span></a></li>
+      <li><a href="zhebushimd5.html"><span class="post-title">task21 Bugku CTF 这不是 md5</span><span class="post-date">2026-09-14</span></a></li>
+      <li><a href="beisijiazu.html"><span class="post-title">task22 Bugku CTF 贝斯家族</span><span class="post-date">2026-09-14</span></a></li>
+      <li><a href="maodun.html"><span class="post-title">task23 Bugku CTF 矛盾</span><span class="post-date">2026-09-14</span></a></li>
+      <li><a href="bazhukunzaizhujuanli.html"><span class="post-title">task24 Bugku CTF 把猪困在猪圈里</span><span class="post-date">2026-09-14</span></a></li>
+      <li><a href="huangdaoshiergong.html"><span class="post-title">task25 Bugku CTF 黄道十二宫</span><span class="post-date">2026-09-14</span></a></li>
+      <li><a href="beifenshigehaodongxi.html"><span class="post-title">task26 Bugku CTF 备份是个好东西</span><span class="post-date">2026-09-14</span></a></li>
+      <li><a href="chaocuodezifu.html"><span class="post-title">task27 Bugku CTF 抄错的字符</span><span class="post-date">2026-09-15</span></a></li>
+      <li><a href="yinxie.html"><span class="post-title">task28 Bugku CTF 隐写</span><span class="post-date">2026-09-15</span></a></li>
+      <li><a href="telnet.html"><span class="post-title">task29 Bugku CTF telnet</span><span class="post-date">2026-09-15</span></a></li>
+      <li><a href="yanjianfeishi.html"><span class="post-title">task30 Bugku CTF 眼见非实</span><span class="post-date">2026-09-15</span></a></li>
+    </ul>
+  </main>
+</body>
+</html>

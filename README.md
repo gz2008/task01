@@ -1,0 +1,12 @@
+# task01
+
+CTF Writeup collection organized by platform.
+
+## Structure
+
+- [Home](index.html)
+- [Bugku](bugku/index.html)
+- [CTFHub](ctfhub/index.html)
+- [Assets](assets/)
+
+All challenge pages use relative links so the repository can be served directly with GitHub Pages.

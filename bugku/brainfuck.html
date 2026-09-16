@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>task09 Bugku CTF source解题WriteUp</title>
+    <title>task15 Bugku CTF [+-<>]解题WriteUp</title>
     <style>
         /* 完全复用你之前统一的页面样式 */
         body {
@@ -97,47 +96,43 @@
 </head>
 <body>
     <div class="container">
-        <a href="index.html " class="back-link">← 返回博客首页</a >
+        <!-- 记得改成你自己的首页文件路径，或者改成 href="#" -->
+        <a href="index.html" class="back-link">← 返回博客首页</a>
 
-        <h1>task09 Bugku CTF source解题WriteUp</h1>
+        <h1>task15 Bugku CTF [+-<>]解题WriteUp</h1>
 
         <h2>题目信息</h2>
         <p>平台: Bugku CTF<br>
-        分类: Web入门 - Git源码泄露<br>
+        分类: Crypto - Brainfuck 编码<br>
         日期: 9月11日<br>
         分值: 10分</p >
 
         <h2>解题思路</h2>
-        <p>这道题的名称是 source（源码），考点是 <b>Git 源码泄露</b>。服务器错误地将隐藏的 <code>.git</code> 目录暴露在了公网上，我们可以通过下载该目录中的文件，回溯 Git 的历史提交记录，从而找到被删除或者隐藏的 Flag。</p >
-        <p>常规的 <code>git clone</code> 命令由于服务器未开启相关协议而报错，因此我们使用了更强大的工具 <code>git-dumper</code> 来完成源码拉取，并使用 <code>git reflog</code> 和 <code>git show</code> 命令来查看被隐藏的提交内容。</p >
+        <p>题目名称为 <code>[+-<>]</code>，这恰好是 <b>Brainfuck 语言</b> 的核心指令集。Brainfuck 是一种极度简化的图灵完备编程语言，它只有8种指令（<code>&gt; &lt; + - . , [ ]</code>）。题目的描述部分直接给出了完整的 Brainfuck 代码，我们只需将其复制出来，使用在线工具运行（解密）即可得到 Flag。</p >
 
         <h2>详细步骤</h2>
         <ol>
-            <li>打开题目网页（如 <code>http://160.202.254.160:13273/</code>），页面只显示 Hello, world! 没有任何有效信息。</li>
-            <li>猜测并尝试访问隐藏目录：在浏览器中访问 <code>http://160.202.254.160:13273/.git/</code>，发现返回了 403 Forbidden 或目录列表，确认存在 Git 源码泄露。</li>
-            <li>打开 Git Bash 命令行工具，尝试使用 <code>git clone</code> 命令下载源码，但提示 <code>fatal: repository ... not found</code>，说明服务器拒绝了标准的 Git 协议请求。</li>
-            <li>改用 <b>git-dumper</b> 工具，直接通过 HTTP 协议抓取整个 .git 目录并在本地还原仓库：<br><code>git-dumper http://160.202.254.160:13273/.git/ ./source</code></li>
-            <li>下载成功后，进入源码目录：<code>cd source</code></li>
-            <li>查看 Git 历史操作记录：<code>git reflog</code>，发现一条可疑的提交记录，哈希值为 <code>40c6d51</code>，提交信息为 "commit: flag is here?"。</li>
-            <li>查看该具体提交修改了哪些内容：<code>git show 40c6d51</code>，发现它将 flag.txt 文件中的 <code>flag{nonono}</code> 修改为了真正的 Flag。</li>
+            <li>直接全选复制题目描述中给出的所有 Brainfuck 代码。</li>
+            <li>打开在线 Brainfuck 解码工具（推荐 <a href="https://www.dcode.fr/brainfuck-language" target="_blank">https://www.dcode.fr/brainfuck-language</a>，无广告且速度快）。</li>
+            <li>将复制的代码粘贴到网页左侧的输入框中。</li>
+            <li>点击下方的 <b>“DECRYPT / RUN”</b> 按钮。</li>
+            <li>网页右侧会瞬间输出运行结果，即为 Flag。</li>
         </ol>
 
-        <h2>关键命令</h2>
+        <h2>工具及操作说明</h2>
         <div class="code-block">
-# 1. 使用 git-dumper 拉取源码
-git-dumper http://靶场IP:端口/.git/ ./source
+# 推荐在线工具（最稳，无需下载任何软件）：
+https://www.dcode.fr/brainfuck-language
 
-# 2. 进入目录并查看历史记录
-cd source
-git reflog
-
-# 3. 查看哈希为 40c6d51 的提交修改内容
-git show 40c6d51
+# 操作顺序：
+1. 复制题目描述中的所有符号 -> 粘贴到网页输入框
+2. 点击 "DECRYPT / RUN"
+3. 右侧输出结果即为 Flag
         </div>
 
         <h2>最终Flag</h2>
         <div class="flag-block">
-flag{git_is_good_distributed_version_control_system}
+flag{请填入你实际解码出来的flag内容}
         </div>
     </div>
 </body>
