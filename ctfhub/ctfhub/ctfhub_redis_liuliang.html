@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub Redis流量 Writeup - gz2008的技术博客</title>
+    <style>
+        body {
+            background: #f6f9fc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            color: #1e293b;
+            line-height: 1.8;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 750px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            padding: 40px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 2rem;
+            color: #0f172a;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #eef2f6;
+            padding-bottom: 15px;
+        }
+        .tags {
+            margin-bottom: 25px;
+        }
+        .tag {
+            display: inline-block;
+            background: #eff6ff;
+            color: #2563eb;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-right: 8px;
+            font-weight: 500;
+        }
+        h2 {
+            font-size: 1.4rem;
+            color: #1e293b;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3b82f6;
+            padding-left: 10px;
+        }
+        p {
+            margin-bottom: 15px;
+            color: #475569;
+        }
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+            color: #475569;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+            color: #e11d48;
+            font-size: 0.9em;
+        }
+        .flag-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            text-align: center;
+            font-family: Consolas, monospace;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="../index.html" class="back-link">← 返回首页</a>
+        
+        <h1>CTFHub - Misc - 流量分析 - Redis流量</h1>
+        
+        <!-- 标签区 -->
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Misc</span>
+            <span class="tag"># 流量分析</span>
+            <span class="tag"># Wireshark</span>
+            <span class="tag"># Redis</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>Redis流量</li>
+            <li><strong>题目方向：</strong>Misc - 流量分析</li>
+            <li><strong>题目附件：</strong><code>redis.pcap</code></li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>Wireshark (网络协议分析器)</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>下载附件并导入：</strong>将附件 <code>redis.pcap</code> 下载到本地，使用 Wireshark 打开。
+            </li>
+            <li>
+                <strong>过滤流量：</strong>Wireshark 对 Redis 的解析协议名并非 "redis"，而是 <strong>RESP</strong>（Redis序列化协议）。因此，在顶部显示过滤器栏中输入 <code>resp</code> 并回车，或直接过滤默认端口 <code>tcp.port == 6379</code>。
+            </li>
+            <li>
+                <strong>追踪 TCP 流：</strong>选中任意一个 <code>RESP</code> 数据包，右键点击 -> 选择 <code>追踪流 (Follow)</code> -> <code>TCP 流 (TCP Stream)</code>。
+            </li>
+            <li>
+                <strong>分析数据流：</strong>Redis 通信是明文传输的。在追踪流窗口中，可以看到一系列 Redis 命令。发现出题人使用了两次 <code>SET</code> 命令，将 Flag 拆分成了两部分：
+                <ul>
+                    <li>第一个命令：<code>SET F14g1 $22 ctfhub{6051d6123de43df</code>（前半段）</li>
+                    <li>第二个命令：<code>SET flag2 $18 ad7609804925c0121}</code>（后半段）</li>
+                </ul>
+            </li>
+            <li>
+                <strong>拼接 Flag：</strong>将两部分字符串按顺序拼接，得到完整的 Flag。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{6051d6123de43dfad7609804925c0121}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <p>这道题延续了流量分析的基础套路，但考察了两个新的知识点：</p>
+        <ul>
+            <li><strong>协议辨析：</strong>Wireshark 中 Redis 对应的协议名是 RESP。如果不清楚，可以使用默认端口 <code>tcp.port == 6379</code> 作为万能替代方案。</li>
+            <li><strong>拆分 Flag 的套路：</strong>出题人常把 Flag 拆散存放在不同位置（如多个数据库键值中），要求选手仔细阅读所有的命令交互记录，并进行拼接。</li>
+            <li><strong>Redis 明文特性：</strong>与 MySQL 的二进制协议不同，Redis 的 RESP 协议是以纯文本形式交互的，追踪流后所见即所得，非常适合新手练习。</li>
+        </ul>
+    </div>
+</body>
+</html>
