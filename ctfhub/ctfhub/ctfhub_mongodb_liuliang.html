@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub MongoDB流量 Writeup - gz2008的技术博客</title>
+    <style>
+        body {
+            background: #f6f9fc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            color: #1e293b;
+            line-height: 1.8;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 750px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            padding: 40px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 2rem;
+            color: #0f172a;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #eef2f6;
+            padding-bottom: 15px;
+        }
+        .tags {
+            margin-bottom: 25px;
+        }
+        .tag {
+            display: inline-block;
+            background: #eff6ff;
+            color: #2563eb;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-right: 8px;
+            font-weight: 500;
+        }
+        h2 {
+            font-size: 1.4rem;
+            color: #1e293b;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3b82f6;
+            padding-left: 10px;
+        }
+        p {
+            margin-bottom: 15px;
+            color: #475569;
+        }
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+            color: #475569;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+            color: #e11d48;
+            font-size: 0.9em;
+        }
+        .flag-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            text-align: center;
+            font-family: Consolas, monospace;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="../index.html" class="back-link">← 返回首页</a>
+        
+        <h1>CTFHub - Misc - 流量分析 - MongoDB流量</h1>
+        
+        <!-- 标签区 -->
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Misc</span>
+            <span class="tag"># 流量分析</span>
+            <span class="tag"># Wireshark</span>
+            <span class="tag"># MongoDB</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>MongoDB流量</li>
+            <li><strong>题目方向：</strong>Misc - 流量分析</li>
+            <li><strong>题目附件：</strong><code>mongodb.pcap</code></li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>Wireshark (网络协议分析器)</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>下载附件并导入：</strong>将附件 <code>mongodb.pcap</code> 下载到本地，使用 Wireshark 打开。
+            </li>
+            <li>
+                <strong>过滤流量：</strong>MongoDB 默认端口为 27017。在显示过滤器栏中输入 <code>mongo</code> 或 <code>tcp.port == 27017</code> 并回车。
+            </li>
+            <li>
+                <strong>追踪 TCP 流：</strong>选中任意数据包，右键点击 -> 选择 <code>追踪流 (Follow)</code> -> <code>TCP 流 (TCP Stream)</code>。
+            </li>
+            <li>
+                <strong>排查数据流：</strong>
+                <ul>
+                    <li>首先查看“流 1”，发现里面只包含 <code>ismaster</code>、<code>listCollections</code>、<code>dbStats</code>、<code>endSessions</code> 等数据库连接初始化和状态检查命令，并未发现业务数据与 Flag。</li>
+                    <li>在追踪流窗口右下角切换至“流 2”。在“流 2”的数据交互中，发现了具体的数据库操作（如 <code>insert</code> 或 <code>find</code> 等），并在数据内容中发现了 <code>ctfhub{...}</code> 格式的字符串。</li>
+                </ul>
+            </li>
+            <li>
+                <strong>提取 Flag：</strong>确认该字符串即为最终需要的 Flag。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{请替换为你找到的真实Flag}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <p>这道题考察了针对 MongoDB 数据库流量的分析能力，核心经验总结如下：</p>
+        <ul>
+            <li><strong>协议过滤：</strong>Wireshark 中 MongoDB 的显示过滤器为 <code>mongo</code>，或者通过默认端口 <code>tcp.port == 27017</code> 过滤。</li>
+            <li><strong>多流排查思维：</strong>数据库流量包通常包含多个 TCP 流。前面的流往往只是连接握手、鉴权和元数据查询（如流1），真正的业务数据（增删改查）通常隐藏在后续的流中。切忌在第一个流中死磕。</li>
+            <li><strong>格式辨识：</strong>MongoDB 使用 BSON 格式，追踪流时可能夹杂少量乱码，但搜索 <code>ctfhub{</code> 关键字依然能精准定位。</li>
+        </ul>
+    </div>
+</body>
+</html>
