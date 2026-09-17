@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub LengthBinary Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Misc - 流量分析 - LengthBinary</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Misc</span>
+            <span class="tag"># 流量分析</span>
+            <span class="tag"># Wireshark</span>
+            <span class="tag"># ICMP</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>LengthBinary</li>
+            <li><strong>题目方向：</strong>Misc - 流量分析</li>
+            <li><strong>题目附件：</strong><code>icmp_len_binary.pcap</code></li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>Wireshark (网络协议分析器)</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>导入并过滤：</strong>将附件导入 Wireshark。因为题目提示和 ping 包有关，使用 <code>icmp</code> 或 <code>icmp.type==8</code>（仅查看请求包，非常重要，避免请求与回复包造成数据错位）进行过滤。
+            </li>
+            <li>
+                <strong>观察长度规律：</strong>点击 <code>Time</code> 列按时间排序后，观察 <code>Length</code> 列。发现数据包的长度只有两种固定取值：74 和 106。
+            </li>
+            <li>
+                <strong>映射为二进制：</strong>结合题目名称中的 "Binary"（二进制），可以推断这两种长度分别代表 0 和 1。
+                <ul>
+                    <li>令较小值 74 = <code>0</code>，较大值 106 = <code>1</code>。</li>
+                    <li>提取前 8 个请求包的长度序列：<code>74, 106, 106, 74, 74, 74, 106, 106</code>。</li>
+                    <li>转换为二进制：<code>01100011</code>，转 ASCII 码恰好为 <code>c</code>，验证成功。</li>
+                </ul>
+            </li>
+            <li>
+                <strong>批量转换：</strong>按时间顺序提取所有请求包的长度，映射为 0/1 序列。每 8 位二进制数转为一个 ASCII 字符。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{04e6fed1e05}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <ul>
+            <li><strong>隐蔽信道：</strong>这是一道经典的利用包长度属性进行信息编码的题目。流量分析不仅要注意 Payload 内容，也要关注包的长度、时间间隔等元数据。</li>
+            <li><strong>区分 Request 与 Reply：</strong>在做 ICMP 相关的流量分析时，务必首先区分请求包和回复包（通常只提取其中一种），否则会导致提取的数据序列翻倍或错位，无法得到正确的 ASCII 码。</li>
+        </ul>
+    </div>
+</body>
+</html>
