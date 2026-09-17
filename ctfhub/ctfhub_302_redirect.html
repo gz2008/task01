@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 302跳转 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - Web前置技能 - HTTP协议 - 302跳转</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># HTTP协议</span>
+            <span class="tag"># 302跳转</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>302跳转</li>
+            <li><strong>题目方向：</strong>Web - Web前置技能 - HTTP协议</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>cURL（命令行工具）或 Burp Suite（抓包工具）</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>分析提示：</strong>题目名称“302跳转”，提示“HTTP临时重定向”。直接使用浏览器访问会被自动重定向，导致无法看到中间过程。我们需要查看 HTTP 响应头中的 <code>Location</code> 字段。
+            </li>
+            <li>
+                <strong>访问根目录：</strong>使用 <code>curl -v http://challenge-xxx.sandbox.ctfhub.com:10800/</code> 访问根路径。发现返回状态码 <code>200 OK</code>，网页提示 “No Flag here!” 并包含一个指向 <code>index.php</code> 的链接。
+            </li>
+            <li>
+                <strong>请求 index.php：</strong>使用命令 <code>curl -v http://challenge-xxx.sandbox.ctfhub.com:10800/index.php</code> 获取真实重定向逻辑。
+            </li>
+            <li>
+                <strong>获取 Flag：</strong>终端输出中会显示状态码 <code>302 Found</code>。在响应头中找到 <code>Location:</code> 字段，其中包含的 URL 通常就带有 Flag，或者顺着该 URL 继续访问即可得到 Flag。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{请替换为你获取到的真实Flag}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <ul>
+            <li><strong>302状态码：</strong>表示临时重定向。服务器返回 302 时，会在响应头 <code>Location</code> 中指定新的 URL，浏览器会自动跳转。</li>
+            <li><strong>抓包的重要性：</strong>浏览器会自动处理重定向，导致人眼看不到跳转过程中的细节。Web 安全中常用 Burp Suite 或 cURL 来阻止自动跳转，从而分析中间的 HTTP 响应头。</li>
+            <li><strong>与“请求方式”题的区别：</strong>上一题考的是“如何问”（请求方法），这道题考的是“服务器如何答”（响应状态码），两者是 HTTP 协议中对立又统一的基础知识点。</li>
+        </ul>
+    </div>
+</body>
+</html>
