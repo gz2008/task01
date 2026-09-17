@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub Length Writeup - gz2008的技术博客</title>
+    <style>
+        body {
+            background: #f6f9fc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            color: #1e293b;
+            line-height: 1.8;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 750px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            padding: 40px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 2rem;
+            color: #0f172a;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #eef2f6;
+            padding-bottom: 15px;
+        }
+        .tags {
+            margin-bottom: 25px;
+        }
+        .tag {
+            display: inline-block;
+            background: #eff6ff;
+            color: #2563eb;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-right: 8px;
+            font-weight: 500;
+        }
+        h2 {
+            font-size: 1.4rem;
+            color: #1e293b;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3b82f6;
+            padding-left: 10px;
+        }
+        p {
+            margin-bottom: 15px;
+            color: #475569;
+        }
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+            color: #475569;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+            color: #e11d48;
+            font-size: 0.9em;
+        }
+        .flag-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            text-align: center;
+            font-family: Consolas, monospace;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+        
+        <h1>CTFHub - Misc - 流量分析 - Length</h1>
+        
+        <!-- 标签区 -->
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Misc</span>
+            <span class="tag"># 流量分析</span>
+            <span class="tag"># Wireshark</span>
+            <span class="tag"># ICMP</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>Length</li>
+            <li><strong>题目方向：</strong>Misc - 流量分析</li>
+            <li><strong>题目附件：</strong><code>icmp_len.pcap</code></li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>Wireshark (网络协议分析器)</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>导入并过滤：</strong>将附件 <code>icmp_len.pcap</code> 导入 Wireshark，在显示过滤器栏输入 <code>icmp</code> 并回车。观察到 <code>Length</code> 列的数据包长度参差不齐，并非正常的固定长度，提示我们答案可能隐藏在数据包的大小中。
+            </li>
+            <li>
+                <strong>计算有效数据长度：</strong>由于 Wireshark 显示的 <code>Length</code> 是整个数据帧的总长度，我们需要减去协议头部长度：
+                <ul>
+                    <li>Ethernet II 头部：14 字节</li>
+                    <li>IPv4 头部：20 字节</li>
+                    <li>ICMP 头部：8 字节</li>
+                    <li>总计头部开销：14 + 20 + 8 = <strong>42 字节</strong></li>
+                    <li>因此，真实的数据长度 = <code>Length</code> - 42。</li>
+                </ul>
+            </li>
+            <li>
+                <strong>提取与转换：</strong>点击 <code>Time</code> 列按时间排序，依次提取每个 ping <strong>请求包（Request）</strong> 的长度并减去 42，将其结果作为 ASCII 码转换为字符。例如：
+                <ul>
+                    <li>包长为 141 -> 141 - 42 = 99 -> ASCII 码对应 'c'</li>
+                    <li>包长为 158 -> 158 - 42 = 116 -> ASCII 码对应 't'</li>
+                    <li>包长为 144 -> 144 - 42 = 102 -> ASCII 码对应 'f'</li>
+                    <li>包长为 146 -> 146 - 42 = 104 -> ASCII 码对应 'h'</li>
+                </ul>
+            </li>
+            <li>
+                <strong>拼接 Flag：</strong>按顺序将所有减后结果转换为字符并拼接，直到最后一个包长 167（167 - 42 = 125 -> '}'），即可得到完整的 Flag。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{acb659f023}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <p>这道题展示了 ICMP 数据外带的另一种变种思路：<strong>通过数据包长度进行隐蔽通信</strong>。</p>
+        <ul>
+            <li>常规的隐写题往往将数据藏在 Data 字段的具体内容（十六进制字节）中，而本题反其道而行之，将信息编码在了包的长度属性上。</li>
+            <li><strong>“偷懒”小技巧：</strong>做题时不必每次心算减去 42。在 Wireshark 下方的详情面板中，展开 <code>Internet Control Message Protocol</code>，可以直接看到 <code>Data (XX bytes)</code> 这一行，括号里的 XX 数字就是已经扣除头部开销后的真实数据长度，直接拿去转换即可。</li>
+            <li>这提醒我们在流量分析中要拓宽思路，数据的外带方式多种多样（内容、长度、时间间隔等），不要局限于表面的 Payload 本身。</li>
+        </ul>
+    </div>
+</body>
+</html>
