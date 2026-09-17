@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub ping也可以携带数据 Writeup - gz2008的技术博客</title>
+    <style>
+        body {
+            background: #f6f9fc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            color: #1e293b;
+            line-height: 1.8;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 750px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            padding: 40px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        h1 {
+            font-size: 2rem;
+            color: #0f172a;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #eef2f6;
+            padding-bottom: 15px;
+        }
+        .tags {
+            margin-bottom: 25px;
+        }
+        .tag {
+            display: inline-block;
+            background: #eff6ff;
+            color: #2563eb;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-right: 8px;
+            font-weight: 500;
+        }
+        h2 {
+            font-size: 1.4rem;
+            color: #1e293b;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-left: 4px solid #3b82f6;
+            padding-left: 10px;
+        }
+        p {
+            margin-bottom: 15px;
+            color: #475569;
+        }
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+            color: #475569;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+            color: #e11d48;
+            font-size: 0.9em;
+        }
+        .flag-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            text-align: center;
+            font-family: Consolas, monospace;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="../index.html" class="back-link">← 返回首页</a>
+        
+        <h1>CTFHub - Misc - 流量分析 - ping也可以携带数据？</h1>
+        
+        <!-- 标签区 -->
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Misc</span>
+            <span class="tag"># 流量分析</span>
+            <span class="tag"># Wireshark</span>
+            <span class="tag"># ICMP</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>ping也可以携带数据？</li>
+            <li><strong>题目方向：</strong>Misc - 流量分析</li>
+            <li><strong>题目附件：</strong><code>icmp_data.pcap</code></li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>Wireshark (网络协议分析器)</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>下载附件并导入：</strong>将附件 <code>icmp_data.pcap</code> 下载到本地，使用 Wireshark 打开。
+            </li>
+            <li>
+                <strong>过滤流量：</strong>根据题目提示，ping 命令使用的是 ICMP 协议。在顶部显示过滤器栏输入 <code>icmp</code> 并回车，筛选出所有 ping 数据包。
+            </li>
+            <li>
+                <strong>分析 Data 字段规律：</strong>选中任意一个 ping 请求包，查看底部的 <code>Data (64 bytes)</code> 字段。经过仔细观察发现：
+                <ul>
+                    <li>开头是变化的干扰数据（如 <code>46451218</code>）。</li>
+                    <li>中间存在固定的前导码 <code>ed ac d7 41</code>，将其作为定位标志。</li>
+                    <li>前导码后紧跟的一个字节是变化的（如 <code>63</code>、<code>74</code>、<code>66</code> 等），这才是真正隐藏的 Flag 数据。</li>
+                    <li>剩余部分全部是 <code>4d</code>（ASCII 字符 'M'），属于出题人故意添加的大量填充干扰项。</li>
+                </ul>
+            </li>
+            <li>
+                <strong>提取有效数据：</strong>按顺序遍历每一个 ping 数据包，提取 <code>ed ac d7 41</code> 后面的第一个字节。例如：
+                <ul>
+                    <li>第 7 包：<code>63</code> -> 'c'</li>
+                    <li>第 9 包：<code>74</code> -> 't'</li>
+                    <li>第 11 包：<code>66</code> -> 'f'</li>
+                    <li>第 13 包：<code>68</code> -> 'h'</li>
+                </ul>
+            </li>
+            <li>
+                <strong>拼接并解码：</strong>将提取出的所有有效字节按顺序拼接（如 <code>63 74 66 68...</code>），使用在线十六进制转 ASCII 工具进行解码，最终得到格式为 <code>ctfhub{...}</code> 的 Flag。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{c87eb99796406ac0b}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <p>这道题揭示了 ICMP 协议在流量分析中的一个重要考点：数据外带。</p>
+        <ul>
+            <li><strong>ICMP 并不安全：</strong>虽然 ping 通常用来测试连通性，但它的 <code>Data</code> 字段可以承载任意数据。黑客经常利用它建立隐蔽隧道来传输文件或敏感信息。</li>
+            <li><strong>善于发现规律：</strong>当数据分散在几十个数据包中时，要善于寻找包与包之间的共同点（如前导码 <code>ed ac d7 41</code>）和差异点（可变字节），从而准确定位真正携带信息的载荷。</li>
+            <li><strong>识别干扰项：</strong>很多 CTF 流量分析题会加入大量无意义的重复字节（如本题的 <code>4d</code>/'M'）作为噪声，做题时需要具备筛选和剔除噪声的能力。</li>
+        </ul>
+    </div>
+</body>
+</html>
