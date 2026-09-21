@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 网站源码 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 信息泄露 - 备份文件下载 - 网站源码</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 信息泄露</span>
+            <span class="tag"># 备份文件下载</span>
+            <span class="tag"># 网站源码</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>网站源码</li>
+            <li><strong>题目方向：</strong>Web - 信息泄露 - 备份文件下载</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>寻找被放置在 Web 目录下的网站源码备份文件，并根据备份内容定位 Flag。</li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>浏览器：查看题目提示和响应内容。</li>
+            <li>cURL：探测备份文件并下载压缩包。</li>
+            <li>unzip 或 tar：查看和解压网站备份文件。</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>分析首页提示：</strong>访问题目根路径后，页面直接给出了常见的网站源码备份文件名和后缀。常见文件名包括 <code>web</code>、<code>website</code>、<code>backup</code>、<code>back</code>、<code>www</code>、<code>wwwroot</code>、<code>temp</code>，常见后缀包括 <code>tar</code>、<code>tar.gz</code>、<code>zip</code>、<code>rar</code>。
+            </li>
+            <li>
+                <strong>枚举备份文件：</strong>根据提示组合文件名和后缀，并使用 HEAD 请求检查状态码。测试到 <code>/www.zip</code> 时返回 <code>200 OK</code>，响应类型为 <code>application/zip</code>，说明网站源码备份文件被直接暴露在 Web 根目录下。
+                <pre>curl.exe -I "http://challenge-xxx.sandbox.ctfhub.com:10800/www.zip"</pre>
+            </li>
+            <li>
+                <strong>下载并解压：</strong>将备份文件下载到本地，并查看压缩包结构：
+                <pre>curl.exe -s "http://challenge-xxx.sandbox.ctfhub.com:10800/www.zip" -o www.zip
+tar.exe -tf www.zip</pre>
+                压缩包中包含 <code>50x.html</code>、<code>index.html</code> 和 <code>flag_2282029806.txt</code>。
+            </li>
+            <li>
+                <strong>检查 Flag 文件：</strong>读取压缩包中的 <code>flag_2282029806.txt</code>：
+                <pre>tar.exe -xOf www.zip flag_2282029806.txt</pre>
+                本例中该文件内容为提示 <code>where is flag ??</code>，说明需要继续检查服务器上对应的同名文件。
+            </li>
+            <li>
+                <strong>访问备份中的文件路径：</strong>使用压缩包中泄露的完整文件名，直接访问服务器根目录下的同名文件：
+                <pre>curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/flag_2282029806.txt"</pre>
+                响应内容即为最终 Flag。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{a11fee757b37de36d3d69cd4}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <ul>
+            <li><strong>备份文件不能放在 Web 目录：</strong><code>www.zip</code> 等源码备份文件一旦被访问，就可能泄露网站结构、源代码和敏感文件。</li>
+            <li><strong>使用常见字典探测：</strong>备份文件通常具有固定的命名习惯，可以使用常见文件名与后缀组合进行目录扫描。</li>
+            <li><strong>检查备份中的全部路径：</strong>解压后不仅要查看文件内容，还要关注文件名和目录结构，尝试访问服务器上的对应路径。</li>
+            <li><strong>响应头可以辅助判断：</strong><code>Content-Type: application/zip</code> 和 <code>200 OK</code> 能快速确认探测到的备份文件有效。</li>
+        </ul>
+    </div>
+</body>
+</html>
