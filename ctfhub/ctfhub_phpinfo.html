@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub PHPINFO Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 信息泄露 - PHPINFO</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 信息泄露</span>
+            <span class="tag"># PHPINFO</span>
+            <span class="tag"># 信息收集</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>PHPINFO</li>
+            <li><strong>题目方向：</strong>Web - 信息泄露</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>根据首页提示访问 PHPINFO 页面，在服务器配置或环境变量中查找 Flag。</li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>浏览器：查看 PHPINFO 页面并使用页面搜索功能。</li>
+            <li>cURL：获取页面内容并快速筛选关键字。</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>访问首页：</strong>题目首页标题为“phpinfo”，页面中提供了“点击查看phpinfo”按钮，对应的链接为 <code>/phpinfo.php</code>。
+            </li>
+            <li>
+                <strong>打开 PHPINFO 页面：</strong>访问 <code>/phpinfo.php</code> 后，可以看到 PHP 版本、Apache 环境、PHP 配置项、扩展信息和环境变量等大量输出。由于页面内容很多，手工逐项翻看效率较低。
+            </li>
+            <li>
+                <strong>搜索关键字：</strong>在浏览器中按 <code>Ctrl + F</code>，依次搜索 <code>flag</code> 或 <code>ctfhub{</code>，快速定位敏感内容。
+            </li>
+            <li>
+                <strong>检查环境变量：</strong>在 <code>Environment</code> 区域可以找到名为 <code>FLAG</code> 的环境变量；在 <code>PHP Variables</code> 区域则可以看到 <code>$_ENV['FLAG']</code>，两者保存的内容相同。
+            </li>
+            <li>
+                <strong>使用 cURL 快速获取：</strong>也可以直接请求 PHPINFO 页面并筛选包含 Flag 的行：
+                <pre>curl.exe -s "http://challenge-xxx.sandbox.ctfhub.com:10800/phpinfo.php" | Select-String -Pattern "FLAG|ctfhub"</pre>
+                命令会直接显示环境变量中的 Flag。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{339e88c80e827350b2db2000}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <ul>
+            <li><strong>PHPINFO 属于高敏感信息：</strong>它会泄露 PHP 版本、服务器路径、模块配置、HTTP 请求信息以及环境变量，生产环境不应公开访问。</li>
+            <li><strong>环境变量是重点检查区域：</strong>Flag 经常被直接写入 <code>FLAG</code> 环境变量，并同时出现在 Apache Environment、<code>$_SERVER</code> 和 <code>$_ENV</code> 中。</li>
+            <li><strong>优先使用搜索：</strong>PHPINFO 输出非常长，直接搜索 <code>flag</code>、<code>ctfhub{</code>、<code>secret</code> 等关键字比逐项阅读更高效。</li>
+            <li><strong>信息泄露题的思路：</strong>先根据页面提示访问调试接口，再从配置、环境变量和服务器元数据中寻找敏感值。</li>
+        </ul>
+    </div>
+</body>
+</html>
