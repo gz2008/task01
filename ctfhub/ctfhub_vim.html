@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub vim缓存 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 信息泄露 - 备份文件下载 - vim缓存</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 信息泄露</span>
+            <span class="tag"># 备份文件下载</span>
+            <span class="tag"># Vim</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>vim缓存</li>
+            <li><strong>题目方向：</strong>Web - 信息泄露 - 备份文件下载</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目提示：</strong>Flag 位于 <code>index.php</code> 源码中；开发人员异常退出 Vim 时可能遗留缓存文件。</li>
+        </ul>
+
+        <h2>二、漏洞原理</h2>
+        <p>Vim 在编辑文件时会生成交换文件（swap file），默认文件名通常是在原文件名前加一个点，并以 <code>.swp</code> 结尾。例如编辑 <code>index.php</code> 时，会生成：</p>
+        <pre>.index.php.swp</pre>
+        <p>如果 Vim 异常退出，且交换文件没有被及时清理，它会一直保留在服务器目录中。Web 服务器通常将该文件作为静态文件返回，因此攻击者可以直接下载并恢复源码或从其中提取敏感内容。</p>
+
+        <h2>三、解题工具</h2>
+        <ul>
+            <li>浏览器：查看首页提示。</li>
+            <li>cURL：下载 Vim 交换文件。</li>
+            <li><code>strings</code> 或 <code>vim -r</code>：查看或恢复交换文件内容。</li>
+        </ul>
+
+        <h2>四、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>访问首页：</strong>页面标题为 <code>CTFHub BackUp Vim</code>，提示 Flag 在 <code>index.php</code> 源码中。
+            </li>
+            <li>
+                <strong>确定交换文件名：</strong>目标文件是 <code>index.php</code>，因此按 Vim 默认命名规则访问隐藏文件：
+                <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/.index.php.swp"</pre>
+            </li>
+            <li>
+                <strong>确认文件泄露：</strong>服务器返回 <code>200 OK</code> 且响应内容以 <code>b0VIM 9.1</code> 开头，说明下载的是有效交换文件。文件中还包含源码路径：
+                <pre>/tmp/skill_web_info_leak_backup_vim/src/index.php</pre>
+            </li>
+            <li>
+                <strong>提取源码内容：</strong>下载到本地后使用字符串提取命令查看可读内容：
+                <pre>curl.exe -sS "http://challenge-xxx.sandbox.ctfhub.com:10800/.index.php.swp" -o index.php.swp
+strings index.php.swp</pre>
+                交换文件中保留了原源码的 PHP 行和 Flag 注释：
+                <pre>&lt;?php
+// ctfhub{1c9bc0e9de156aea54073b92}
+?&gt;</pre>
+            </li>
+            <li>
+                <strong>获取 Flag：</strong>从源码注释中提取完整 Flag 并提交。
+            </li>
+        </ol>
+
+        <h2>五、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{1c9bc0e9de156aea54073b92}
+        </div>
+
+        <h2>六、修复建议</h2>
+        <ul>
+            <li>禁止 Web 服务器直接访问 <code>.swp</code>、<code>.swo</code>、<code>.swn</code> 等 Vim 临时文件。</li>
+            <li>部署前检查并清理源码目录中的隐藏文件和编辑器缓存文件。</li>
+            <li>通过构建流程发布制品，避免将开发目录或源码编辑环境直接部署到线上。</li>
+        </ul>
+
+        <h2>七、解题总结</h2>
+        <p>本题的关键是根据题目提示构造 Vim 默认交换文件名 <code>.index.php.swp</code>。交换文件不属于 PHP 源码，服务器不会解析其中的内容，而是将它作为普通文件下载，从而造成源码信息泄露。</p>
+    </div>
+</body>
+</html>
