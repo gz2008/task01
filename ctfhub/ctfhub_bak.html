@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub bak Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 信息泄露 - 备份文件下载 - bak</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 信息泄露</span>
+            <span class="tag"># 备份文件下载</span>
+            <span class="tag"># bak</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>bak</li>
+            <li><strong>题目方向：</strong>Web - 信息泄露 - 备份文件下载</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目提示：</strong>Flag in index.php source code.</li>
+        </ul>
+
+        <h2>二、解题工具</h2>
+        <ul>
+            <li>浏览器：查看首页提示和源码备份内容。</li>
+            <li>cURL：探测备份文件并读取源码。</li>
+        </ul>
+
+        <h2>三、解题思路与步骤</h2>
+        <ol>
+            <li>
+                <strong>分析首页提示：</strong>访问题目根路径后，页面标题为 <code>CTFHub 备份文件下载 - bak</code>，正文提示 Flag 位于 <code>index.php</code> 的源代码中。
+            </li>
+            <li>
+                <strong>推断备份文件名：</strong>题目类型为 <code>bak</code>，说明开发者可能将 <code>index.php</code> 的备份留在了 Web 目录下。常见备份形式包括 <code>index.php.bak</code>、<code>index.bak</code>、<code>index.php~</code> 和 <code>index.php.swp</code>。
+            </li>
+            <li>
+                <strong>探测备份文件：</strong>访问 <code>/index.php.bak</code>，服务器返回 <code>200 OK</code>，响应类型为 <code>application/x-trash</code>，说明备份文件确实存在：
+                <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/index.php.bak"</pre>
+            </li>
+            <li>
+                <strong>读取泄露源码：</strong>备份文件没有经过 PHP 解析，因此可以直接看到原始 PHP 代码。响应内容中保留了如下注释：
+                <pre>// FLAG: ctfhub{a7fe47252418e59cb7789393}</pre>
+            </li>
+            <li>
+                <strong>获取 Flag：</strong>从源码注释中提取完整 Flag 并提交。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{a7fe47252418e59cb7789393}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <ul>
+            <li><strong>备份文件不能存放在 Web 根目录：</strong><code>.bak</code>、<code>~</code>、<code>.swp</code> 等编辑器或备份文件通常以静态文本提供，不会被 PHP 解析，能够直接泄露源码。</li>
+            <li><strong>根据题目提示缩小范围：</strong>题目明确指出 Flag 在 <code>index.php</code> 源码中，可以围绕该文件名尝试常见备份后缀。</li>
+            <li><strong>关注响应类型和状态码：</strong><code>200 OK</code> 与 <code>application/x-trash</code> 说明请求到的不是普通 HTML 页面，而是源代码备份。</li>
+            <li><strong>源码注释也可能包含敏感信息：</strong>开发、调试期间写入的注释同样可能造成信息泄露。</li>
+        </ul>
+    </div>
+</body>
+</html>
