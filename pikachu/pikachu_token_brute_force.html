@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu Token 防爆破 Writeup - gz2008的技术博客</title>
+    <style>
+        body { background:#f6f9fc; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif; color:#1e293b; line-height:1.8; padding:40px 20px; display:flex; justify-content:center; }
+        .container { max-width:750px; width:100%; background:#fff; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,.05); padding:40px; }
+        .back-link { display:inline-block; margin-bottom:20px; color:#3b82f6; text-decoration:none; font-weight:500; }
+        .back-link:hover { text-decoration:underline; }
+        h1 { font-size:2rem; color:#0f172a; border-bottom:2px solid #eef2f6; padding-bottom:15px; }
+        h2 { font-size:1.4rem; color:#1e293b; margin-top:30px; border-left:4px solid #3b82f6; padding-left:10px; }
+        h3 { font-size:1.1rem; color:#334155; margin-top:22px; }
+        p, li { color:#475569; }
+        code { background:#f1f5f9; padding:2px 6px; border-radius:4px; font-family:Consolas,monospace; color:#e11d48; }
+        pre { background:#1e293b; color:#e2e8f0; padding:15px; border-radius:8px; overflow-x:auto; font-family:Consolas,monospace; }
+        table { width:100%; border-collapse:collapse; margin:15px 0; }
+        th, td { border:1px solid #e2e8f0; padding:9px 12px; text-align:left; }
+        th { background:#f8fafc; color:#334155; }
+        .tag { display:inline-block; background:#eff6ff; color:#2563eb; padding:4px 12px; border-radius:20px; font-size:.85rem; margin-right:8px; }
+        .note { background:#fff7ed; border-left:4px solid #f97316; padding:12px 16px; border-radius:6px; color:#9a3412; margin:18px 0; }
+        .success { background:#f0fdf4; border-left:4px solid #22c55e; padding:12px 16px; border-radius:6px; color:#166534; margin:18px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-link">← 返回 Pikachu 首页</a>
+        <h1>Pikachu - 暴力破解 - Token 防爆破</h1>
+        <p>
+            <span class="tag"># Pikachu</span>
+            <span class="tag"># Web</span>
+            <span class="tag"># Token</span>
+            <span class="tag"># Burp Suite</span>
+            <span class="tag"># Session</span>
+        </p>
+
+        <h2>一、题目信息</h2>
+        <ul>
+            <li><strong>题目名称：</strong>token 防爆破？</li>
+            <li><strong>题目路径：</strong>Pikachu → 暴力破解 → token 防爆破？</li>
+            <li><strong>题目方向：</strong>Web - 登录 Token 与 Session 校验</li>
+            <li><strong>题目环境：</strong>本地部署，PHP 7.4.33 + MariaDB 10.11.19 + PHP 内置服务器</li>
+            <li><strong>访问地址：</strong><code>http://127.0.0.1/pikachu/vul/burteforce/bf_token.php</code></li>
+            <li><strong>验证账号：</strong><code>admin / 123456</code></li>
+        </ul>
+
+        <div class="note">
+            本文只记录本机 Pikachu 靶场实验，不针对任何未授权系统。会话 Cookie 和 Token 示例均不作为真实凭据使用。
+        </div>
+
+        <h2>二、源码分析</h2>
+        <p>页面表单中包含一个隐藏的 Token 字段：</p>
+        <pre>&lt;input type="hidden" name="token" value="..." /&gt;</pre>
+        <p>服务端接收登录请求后，先比较客户端提交的 Token 和当前 Session 中的 Token：</p>
+        <pre>if($token == $_SESSION['token']){
+    if($line_pre-&gt;execute()){
+        $line_pre-&gt;store_result();
+        if($line_pre-&gt;num_rows &gt; 0){
+            $html .= '&lt;p&gt; login success&lt;/p&gt;';
+        }
+    }
+} else {
+    $html .= '&lt;p&gt; csrf token error&lt;/p&gt;';
+}</pre>
+        <p>Token 的生成逻辑位于 <code>inc/function.php</code>：</p>
+        <pre>function set_token(){
+    if(isset($_SESSION['token'])){
+        unset($_SESSION['token']);
+    }
+    $_SESSION['token'] = str_replace('.', '', uniqid(mt_rand(10000, 99999), true));
+}</pre>
+        <p>页面末尾调用 <code>set_token()</code>，因此每次响应结束后，当前 Session 中的 Token 都会更新。下一次请求必须使用最新 Token。</p>
+
+        <h2>三、Burp / DevTools 验证</h2>
+        <ol>
+            <li>访问题目页面，保持当前浏览器会话。</li>
+            <li>在 Elements 中找到 <code>input[name="token"]</code>，记录当前 Token。</li>
+            <li>提交一次错误 Token，观察返回：</li>
+        </ol>
+        <pre>&lt;p&gt; csrf token error&lt;/p&gt;</pre>
+        <p>这说明服务端先拒绝了请求，尚未进入用户名和密码校验。</p>
+
+        <p>重新加载页面获得最新 Token，再提交错误密码：</p>
+        <pre>POST /pikachu/vul/burteforce/bf_token.php HTTP/1.1
+Cookie: PHPSESSID=&lt;current-session&gt;
+
+username=admin&amp;password=wrong&amp;token=&lt;current-token&gt;&amp;submit=Login</pre>
+        <p>返回：</p>
+        <pre>&lt;p&gt; username or password is not exists～&lt;/p&gt;</pre>
+        <p>这说明 Token 校验已经通过，请求进入了账号密码校验。</p>
+
+        <h2>四、登录验证</h2>
+        <p>在同一会话中使用最新 Token 和本地测试账号：</p>
+        <pre>username=admin&amp;password=123456&amp;token=&lt;current-token&gt;&amp;submit=Login</pre>
+        <div class="success">
+            返回 <code>&lt;p&gt; login success&lt;/p&gt;</code>，验证成功。
+        </div>
+
+        <h2>五、Token 与 Session 的关系</h2>
+        <table>
+            <tr><th>测试条件</th><th>结果</th><th>说明</th></tr>
+            <tr><td>错误 Token</td><td><code>csrf token error</code></td><td>Token 与 Session 不匹配</td></tr>
+            <tr><td>正确 Token + 错误密码</td><td>账号或密码错误</td><td>已通过 Token 校验</td></tr>
+            <tr><td>正确 Token + 正确密码</td><td><code>login success</code></td><td>登录成功</td></tr>
+            <tr><td>旧 Token 重放</td><td>Token 校验失败</td><td>页面响应后 Session Token 已更新</td></tr>
+        </table>
+        <p><code>PHPSESSID</code> 标识当前 PHP 会话，Token 保存在该会话中。只复制 Token 而不携带对应 Cookie，或者使用其他会话的 Cookie，都不能通过校验。</p>
+
+        <h2>六、结论与修复建议</h2>
+        <ul>
+            <li>Token 可以防止跨会话伪造和旧请求重放，但必须使用安全随机数，并设置合理的有效期。</li>
+            <li>登录请求应维护 Session Cookie，并获取与当前会话匹配的最新 Token。</li>
+            <li>Token 不能替代登录限速、失败次数限制、账号锁定和强密码策略。</li>
+            <li>实际系统还应避免使用可预测的 <code>uniqid()</code> 作为安全 Token，改用密码学安全随机数。</li>
+        </ul>
+
+        <h2>七、总结</h2>
+        <p>本题通过一个隐藏表单字段展示 Token 校验流程。判断响应时，应先区分 Token 校验失败和账号密码校验失败，再使用 Burp 的请求详情观察 <code>PHPSESSID</code>、<code>token</code> 与表单参数之间的关系。</p>
+    </div>
+</body>
+</html>
