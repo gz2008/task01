@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu 反射型 XSS（GET）Writeup - gz2008的技术博客</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin:0; background:#f6f9fc; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif; color:#1e293b; line-height:1.8; padding:40px 20px; }
+        .container { max-width:750px; margin:auto; background:#fff; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.05); padding:40px; }
+        .back-link { color:#2563eb; text-decoration:none; }
+        h1 { font-size:2rem; line-height:1.35; color:#0f172a; border-bottom:2px solid #eef2f6; padding-bottom:15px; }
+        h2 { font-size:1.35rem; margin-top:30px; border-left:4px solid #3b82f6; padding-left:10px; }
+        p, li { color:#475569; }
+        code { background:#f1f5f9; padding:2px 5px; border-radius:4px; overflow-wrap:anywhere; color:#be123c; }
+        pre { background:#1e293b; color:#e2e8f0; padding:15px; border-radius:6px; overflow-x:auto; }
+        pre code { background:none; color:inherit; padding:0; }
+        img { display:block; max-width:100%; height:auto; margin:12px 0; border:1px solid #e2e8f0; }
+        figcaption { font-size:.9rem; color:#64748b; }
+        .note { background:#f0fdf4; border-left:4px solid #22c55e; padding:12px 16px; }
+        @media (max-width:600px) { body { padding:0; } .container { padding:24px 18px; } h1 { font-size:1.65rem; } }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <a class="back-link" href="index.html">← 返回 Pikachu 首页</a>
+        <h1>Pikachu - 反射型 XSS（GET）</h1>
+        <p>分类：Web / XSS · 环境：本机 Pikachu 靶场 · 题目路径：Cross-Site Scripting → 反射型 xss(get)</p>
+        <p class="note">仅在自己部署的 <code>127.0.0.1</code> 靶场练习；测试代码只弹出数字，不读取或发送任何数据。</p>
+
+        <h2>一、正常回显</h2>
+        <p>打开 <code>/pikachu/vul/xss/xss_reflected_get.php</code>，提交 <code>kobe</code>，页面显示对应文案及图片。再输入 <code>test123</code>，地址栏出现 <code>message=test123&amp;submit=submit</code>，页面显示 <code>who is test123,i don't care!</code>。这证明输入通过 GET 参数传给服务器，再被放回页面。</p>
+
+        <h2>二、源码与成因</h2>
+        <p>服务端检测到 <code>submit</code> 参数后，将 <code>message</code> 直接拼入 HTML，没有做输出转义：</p>
+        <pre><code>if (isset($_GET['submit'])) {
+    // 省略空值和 kobe 分支
+    $html .= "&lt;p class='notice'&gt;who is {$_GET['message']},i don't care!&lt;/p&gt;";
+}
+// 页面中执行 echo $html;</code></pre>
+        <p>页面输入框虽然有 <code>maxlength="20"</code>，但它只限制在输入框内键入的字符数；直接编辑 GET 请求的 URL 不受这个 HTML 属性约束。</p>
+
+        <h2>三、构造与验证</h2>
+        <ol>
+            <li>将地址中的 <code>message=test123</code> 改为 <code>message=&lt;script&gt;alert(1)&lt;/script&gt;</code>，保留 <code>&amp;submit=submit</code>。</li>
+            <li>可复制的 URL 编码形式如下；其中 <code>%3C</code> 和 <code>%3E</code> 分别表示 <code>&lt;</code> 和 <code>&gt;</code>：</li>
+        </ol>
+        <pre><code>http://127.0.0.1/pikachu/vul/xss/xss_reflected_get.php?message=%3Cscript%3Ealert(1)%3C%2Fscript%3E&amp;submit=submit</code></pre>
+        <p>本地 HTTP 请求返回 200，响应中包含 <code>who is &lt;script&gt;alert(1)&lt;/script&gt;</code>。浏览器开发者工具的 Elements 面板也能看到脚本成为 <code>p.notice</code> 中的子元素；截图记录的是该 DOM 结果，不是弹窗截图。</p>
+        <figure>
+            <img src="pikachu_xss_reflected_get_dom.png" alt="Pikachu 反射型 XSS GET 页面中，开发者工具显示 p.notice 内的 script alert(1) 元素">
+            <figcaption>浏览器 Elements 面板：输入未被转义，作为 script 元素进入 DOM。</figcaption>
+        </figure>
+        <p>若浏览器显示内容为 <code>1</code> 的弹窗，表示脚本已执行。HTTP 回显与 DOM 注入已核实；本文不把未单独留存的弹窗画面当作独立截图证据。</p>
+
+        <h2>四、修复思路</h2>
+        <p>在输出到 HTML 文本节点时进行上下文对应的编码，例如：</p>
+        <pre><code>$message = htmlspecialchars($_GET['message'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+$html .= "&lt;p class='notice'&gt;who is {$message},i don't care!&lt;/p&gt;";</code></pre>
+        <p>这样浏览器收到的是 <code>&amp;lt;script&amp;gt;</code> 等实体，只会显示输入文字，不会创建可执行的脚本元素。服务端输出编码才是这里的关键；<code>maxlength</code> 不能代替它。</p>
+    </main>
+</body>
+</html>
