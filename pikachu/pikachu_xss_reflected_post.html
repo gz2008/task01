@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu 反射型 XSS（POST）Writeup - gz2008的技术博客</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin:0; background:#f6f9fc; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif; color:#1e293b; line-height:1.8; padding:40px 20px; }
+        .container { max-width:750px; margin:auto; background:#fff; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.05); padding:40px; }
+        .back-link { color:#2563eb; text-decoration:none; }
+        h1 { font-size:2rem; line-height:1.35; color:#0f172a; border-bottom:2px solid #eef2f6; padding-bottom:15px; }
+        h2 { font-size:1.35rem; margin-top:30px; border-left:4px solid #3b82f6; padding-left:10px; }
+        p, li { color:#475569; }
+        code { background:#f1f5f9; padding:2px 5px; border-radius:4px; overflow-wrap:anywhere; color:#be123c; }
+        pre { background:#1e293b; color:#e2e8f0; padding:15px; border-radius:6px; overflow-x:auto; }
+        pre code { background:none; color:inherit; padding:0; }
+        .note { background:#f0fdf4; border-left:4px solid #22c55e; padding:12px 16px; }
+        @media (max-width:600px) { body { padding:0; } .container { padding:24px 18px; } h1 { font-size:1.65rem; } }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <a class="back-link" href="index.html">← 返回 Pikachu 首页</a>
+        <h1>Pikachu - 反射型 XSS（POST）</h1>
+        <p>分类：Web / XSS · 环境：本机 Pikachu 靶场 · 题目路径：Cross-Site Scripting → 反射型 xss(post)</p>
+        <p class="note">仅在自己部署的 <code>127.0.0.1</code> 靶场练习；测试代码只弹出数字，不读取或发送任何数据。</p>
+
+        <h2>一、登录题目</h2>
+        <p>打开 <code>/pikachu/vul/xss/xsspost/post_login.php</code>，使用 <code>admin / 123456</code> 登录。登录成功后页面跳转到 <code>xss_reflected_post.php</code>，并通过 Cookie 判断登录状态。</p>
+        <p>这里先用错误密码测试，页面返回 <code>username or password error!</code>；再使用正确密码登录，确认题目流程正常。</p>
+
+        <h2>二、普通 POST 回显</h2>
+        <p>在输入框提交 <code>test123</code>，页面显示：</p>
+        <pre><code>who is test123,i don't care!</code></pre>
+        <p>这说明输入来自 POST 请求体中的 <code>message</code> 参数，而不是地址栏查询字符串。POST 只改变了数据传输位置，不会自动提供 XSS 防护。</p>
+
+        <h2>三、源码与漏洞成因</h2>
+        <p>题目源码直接把 <code>$_POST['message']</code> 拼入 HTML：</p>
+        <pre><code>if (isset($_POST['submit'])) {
+    if ($_POST['message'] == 'kobe') {
+        $html .= "&lt;p class='notice'&gt;愿你和{$_POST['message']}一样，永远年轻！&lt;/p&gt;";
+    } else {
+        $html .= "&lt;p class='notice'&gt;who is {$_POST['message']},i don't care!&lt;/p&gt;";
+    }
+}</code></pre>
+        <p>服务端没有进行 HTML 输出编码，因此攻击者可以提交 HTML 标签。浏览器解析响应时，会把标签当成页面结构，而不是普通文本。</p>
+
+        <h2>四、构造与验证</h2>
+        <p>提交下面的无害测试载荷：</p>
+        <pre><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></pre>
+        <p>请求体示例：</p>
+        <pre><code>message=%3Cscript%3Ealert%281%29%3C%2Fscript%3E&amp;submit=submit</code></pre>
+        <p>本地验证结果：</p>
+        <ul>
+            <li>错误密码被拒绝，正确账号可以进入题目页面。</li>
+            <li><code>test123</code> 被原样反射到响应 HTML。</li>
+            <li><code>&lt;script&gt;alert(1)&lt;/script&gt;</code> 被原样保留在响应 HTML 中，证明输入未被转义。</li>
+            <li>提交内容位于 POST 请求体，地址栏没有 <code>message</code> 查询参数。</li>
+        </ul>
+        <p>在浏览器中提交该载荷时会弹出内容为 <code>1</code> 的提示框；这只用于确认脚本执行，不涉及 Cookie 或其他数据。</p>
+
+        <h2>五、修复思路</h2>
+        <p>输出到 HTML 文本节点时，应使用对应上下文的编码：</p>
+        <pre><code>$message = htmlspecialchars(
+    $_POST['message'],
+    ENT_QUOTES | ENT_SUBSTITUTE,
+    'UTF-8'
+);
+$html .= "&lt;p class='notice'&gt;who is {$message},i don't care!&lt;/p&gt;";</code></pre>
+        <p>修复后，浏览器只会显示 <code>&lt;script&gt;alert(1)&lt;/script&gt;</code> 这段文字，不会创建并执行脚本。不要把 POST、输入框限制或前端校验当成服务端 XSS 防护。</p>
+    </main>
+</body>
+</html>
