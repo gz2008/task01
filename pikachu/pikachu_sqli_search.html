@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu 搜索型 SQL 注入 Writeup - gz2008的技术博客</title>
+    <style>
+        *{box-sizing:border-box}body{margin:0;background:#f6f9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;color:#1e293b;line-height:1.8;padding:40px 20px}.container{max-width:750px;margin:auto;background:#fff;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.05);padding:40px}.back-link{color:#2563eb;text-decoration:none}h1{font-size:2rem;line-height:1.35;color:#0f172a;border-bottom:2px solid #eef2f6;padding-bottom:15px}h2{font-size:1.35rem;margin-top:30px;border-left:4px solid #3b82f6;padding-left:10px}p,li{color:#475569}code{background:#f1f5f9;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere;color:#be123c}pre{background:#1e293b;color:#e2e8f0;padding:15px;border-radius:6px;overflow-x:auto}pre code{background:none;color:inherit;padding:0}.note{background:#fff7ed;border-left:4px solid #f97316;padding:12px 16px}@media(max-width:600px){body{padding:0}.container{padding:24px 18px}h1{font-size:1.65rem}}
+    </style>
+</head>
+<body>
+<main class="container">
+    <a class="back-link" href="index.html">← 返回 Pikachu 首页</a>
+    <h1>Pikachu - SQL 注入 - 搜索型注入</h1>
+    <p>分类：Web / SQL Injection · 环境：本机 Pikachu 靶场 · 题目路径：SQL-Inject → 搜索型注入</p>
+    <h2>一、漏洞成因</h2>
+    <pre><code>$name = $_GET['name'];
+$query = "select username,id,email from member where username like '%$name%'";</code></pre>
+    <p>输入被放进模糊匹配语句，但没有转义或参数化。测试时要闭合原有的单引号和百分号结构。</p>
+    <h2>二、验证过程</h2>
+    <pre><code>GET /pikachu/vul/sqli/sqli_search.php?name=%27%20OR%201%3D1%20%23&amp;submit=x</code></pre>
+    <p>payload 为 <code>' OR 1=1 #</code>。响应列出了 vince、allen、kobe、grady、kevin、lucy、lili 等会员，说明搜索条件已被绕过。</p>
+    <p>该页面还把原始输入拼回 HTML，源码中另有反射型 XSS 风险；SQL 注入与 XSS 应分别修复。</p>
+    <h2>三、修复建议</h2>
+    <p>使用预处理语句构造 <code>LIKE</code> 条件，并对输出使用上下文相关的 HTML 转义。</p>
+</main>
+</body>
+</html>

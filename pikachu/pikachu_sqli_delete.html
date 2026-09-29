@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu Delete SQL 注入 Writeup - gz2008的技术博客</title>
+    <style>
+        *{box-sizing:border-box}body{margin:0;background:#f6f9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;color:#1e293b;line-height:1.8;padding:40px 20px}.container{max-width:750px;margin:auto;background:#fff;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.05);padding:40px}.back-link{color:#2563eb;text-decoration:none}h1{font-size:2rem;line-height:1.35;color:#0f172a;border-bottom:2px solid #eef2f6;padding-bottom:15px}h2{font-size:1.35rem;margin-top:30px;border-left:4px solid #3b82f6;padding-left:10px}p,li{color:#475569}code{background:#f1f5f9;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere;color:#be123c}pre{background:#1e293b;color:#e2e8f0;padding:15px;border-radius:6px;overflow-x:auto}pre code{background:none;color:inherit;padding:0}.note{background:#fff7ed;border-left:4px solid #f97316;padding:12px 16px}@media(max-width:600px){body{padding:0}.container{padding:24px 18px}h1{font-size:1.65rem}}
+    </style>
+</head>
+<body>
+<main class="container">
+    <a class="back-link" href="index.html">← 返回 Pikachu 首页</a>
+    <h1>Pikachu - SQL 注入 - Delete 注入</h1>
+    <p>分类：Web / SQL Injection · 环境：本机 Pikachu 靶场 · 题目路径：SQL-Inject → delete 注入</p>
+    <h2>一、漏洞成因</h2>
+    <pre><code>if(array_key_exists('id', $_GET)){
+    $query = "delete from message where id={$_GET['id']}";
+    execute($link, $query);
+}</code></pre>
+    <p>删除链接中的 <code>id</code> 没有执行 <code>is_numeric</code> 校验，用户可以直接控制 DELETE 的 WHERE 条件。</p>
+    <h2>二、验证过程</h2>
+    <p>先提交一条只用于测试的留言，再将删除请求中的 id 改为条件表达式：</p>
+    <pre><code>GET /pikachu/vul/sqli/sqli_del.php?id=0 OR content LIKE 'writeup-delete-test%'</code></pre>
+    <p>本地测试请求返回 <code>302 Found</code>，响应位置为 <code>sqli_del.php</code>，说明删除语句执行了。验证数据使用独立测试留言，测试后应清理。</p>
+    <h2>三、修复建议</h2>
+    <p>服务端将 id 转换为整数并使用参数化 DELETE；同时增加登录、权限和 CSRF 校验，不能把“知道链接”当成删除权限。</p>
+</main>
+</body>
+</html>

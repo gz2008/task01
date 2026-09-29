@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu Insert Update SQL 注入 Writeup - gz2008的技术博客</title>
+    <style>
+        *{box-sizing:border-box}body{margin:0;background:#f6f9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;color:#1e293b;line-height:1.8;padding:40px 20px}.container{max-width:750px;margin:auto;background:#fff;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.05);padding:40px}.back-link{color:#2563eb;text-decoration:none}h1{font-size:2rem;line-height:1.35;color:#0f172a;border-bottom:2px solid #eef2f6;padding-bottom:15px}h2{font-size:1.35rem;margin-top:30px;border-left:4px solid #3b82f6;padding-left:10px}p,li{color:#475569}code{background:#f1f5f9;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere;color:#be123c}pre{background:#1e293b;color:#e2e8f0;padding:15px;border-radius:6px;overflow-x:auto}pre code{background:none;color:inherit;padding:0}.note{background:#fff7ed;border-left:4px solid #f97316;padding:12px 16px}@media(max-width:600px){body{padding:0}.container{padding:24px 18px}h1{font-size:1.65rem}}
+    </style>
+</head>
+<body>
+<main class="container">
+    <a class="back-link" href="index.html">← 返回 Pikachu 首页</a>
+    <h1>Pikachu - SQL 注入 - Insert/Update 注入</h1>
+    <p>分类：Web / SQL Injection · 环境：本机 Pikachu 靶场 · 题目路径：SQL-Inject → insert/update 注入</p>
+    <h2>一、漏洞成因</h2>
+    <p>登录后，编辑资料接口直接使用 <code>$_POST</code> 拼接 UPDATE 语句，没有调用转义函数：</p>
+    <pre><code>$getdata = $_POST;
+$query = "update member set sex='{$getdata['sex']}',
+phonenum='{$getdata['phonenum']}', address='{$getdata['add']}',
+email='{$getdata['email']}' where username='{$_SESSION['sqli']['username']}'";</code></pre>
+    <h2>二、验证过程</h2>
+    <p>先用题目内置会员 <code>vince/123456</code> 登录，再在 <code>add</code> 字段提交：</p>
+    <pre><code>test-address',sex='injected</code></pre>
+    <p>该输入会闭合 <code>address</code> 字符串并额外写入 <code>sex</code> 字段。提交请求在本地返回 <code>302</code> 并跳转到 <code>sqli_mem.php</code>，说明 UPDATE 分支被执行。当前绿色环境的旧式 <code>MYSQL_ASSOC</code> 用法会影响会员页回显，因此这里只把 302 和源码路径作为验证证据，不虚构页面最终值。</p>
+    <h2>三、Insert 的同类风险</h2>
+    <p>注册接口同样直接拼接 INSERT 语句。字段未参数化时，输入可以改变列值或增加 SQL 语句片段。</p>
+    <h2>四、修复建议</h2>
+    <p>所有 INSERT、UPDATE 都使用预处理语句；对每个字段做长度、类型和业务校验，并限制当前用户只能修改允许的列。</p>
+</main>
+</body>
+</html>
