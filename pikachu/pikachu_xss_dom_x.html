@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu DOM 型 XSS-X Writeup - gz2008的技术博客</title>
+    <style>
+        *{box-sizing:border-box} body{margin:0;background:#f6f9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;color:#1e293b;line-height:1.8;padding:40px 20px}.container{max-width:750px;margin:auto;background:#fff;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.05);padding:40px}.back-link{color:#2563eb;text-decoration:none}h1{font-size:2rem;line-height:1.35;color:#0f172a;border-bottom:2px solid #eef2f6;padding-bottom:15px}h2{font-size:1.35rem;margin-top:30px;border-left:4px solid #3b82f6;padding-left:10px}p,li{color:#475569}code{background:#f1f5f9;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere;color:#be123c}pre{background:#1e293b;color:#e2e8f0;padding:15px;border-radius:6px;overflow-x:auto}pre code{background:none;color:inherit;padding:0}.note{background:#f0fdf4;border-left:4px solid #22c55e;padding:12px 16px}@media(max-width:600px){body{padding:0}.container{padding:24px 18px}h1{font-size:1.65rem}}
+    </style>
+</head>
+<body>
+<main class="container">
+    <a class="back-link" href="index.html">← 返回 Pikachu 首页</a>
+    <h1>Pikachu - DOM 型 XSS-X</h1>
+    <p>分类：Web / XSS · 环境：本机 Pikachu 靶场 · 题目路径：Cross-Site Scripting → DOM 型 xss-x</p>
+    <p class="note">仅在自己部署的 <code>127.0.0.1</code> 靶场练习；测试脚本只弹出数字，不读取或发送数据。</p>
+
+    <h2>一、入口与数据流</h2>
+    <p>访问 <code>/pikachu/vul/xss/xss_dom_x.php</code>，提交表单后地址栏会出现 <code>text=...</code>。点击页面中的链接时，JavaScript 从 <code>window.location.search</code> 取出参数，并写入 <code>div#dom</code>。</p>
+
+    <h2>二、源码与成因</h2>
+    <pre><code>var str = window.location.search;
+var txss = decodeURIComponent(str.split("text=")[1]);
+var xss = txss.replace(/\+/g, ' ');
+document.getElementById("dom").innerHTML =
+    "&lt;a href='" + xss + "'&gt;就让往事都随风&lt;/a&gt;";</code></pre>
+    <p>这里的危险源是 URL 查询字符串，危险 sink 是 <code>innerHTML</code>。服务端仅输出页面框架，实际注入和执行完全发生在浏览器端。</p>
+
+    <h2>三、构造与验证</h2>
+    <p>可直接访问下面的本地测试 URL：</p>
+    <pre><code>http://127.0.0.1/pikachu/vul/xss/xss_dom_x.php?text='%3E%3Cimg%20src%3D%22%23%22%20onmouseover%3D%22alert(1)%22%3E</code></pre>
+    <p>点击页面中的提交按钮或生成的链接，随后将鼠标移到插入的图片位置。若弹出 <code>1</code>，说明 URL 参数已被解码并作为 HTML 执行。Elements 面板可用于确认原始标签进入了 DOM。</p>
+
+    <h2>四、与反射型 XSS 的区别</h2>
+    <ul>
+        <li>反射型 XSS 的危险字符串通常由服务端放入响应 HTML。</li>
+        <li>本题的服务端不需要把参数原样反射；前端脚本从 URL 读取参数并生成 HTML。</li>
+        <li>修复重点是浏览器端数据流，尤其是避免 <code>innerHTML</code> 拼接。</li>
+    </ul>
+
+    <h2>五、修复思路</h2>
+    <p>使用 <code>URLSearchParams</code> 读取参数，并通过安全 DOM API 设置链接地址和文本：</p>
+    <pre><code>const value = new URLSearchParams(location.search).get("text") || "";
+const link = document.createElement("a");
+link.href = value;
+link.textContent = "就让往事都随风";
+document.getElementById("dom").replaceChildren(link);</code></pre>
+    <p>还应限制可接受的协议，例如只允许 <code>https:</code> 或 <code>http:</code>，避免把危险协议写入 <code>href</code>。</p>
+</main>
+</body>
+</html>

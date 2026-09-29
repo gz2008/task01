@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu CSRF GET Writeup - gz2008的技术博客</title>
+    <style>
+        *{box-sizing:border-box} body{margin:0;background:#f6f9fc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;color:#1e293b;line-height:1.8;padding:40px 20px}.container{max-width:750px;margin:auto;background:#fff;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.05);padding:40px}.back-link{color:#2563eb;text-decoration:none}h1{font-size:2rem;line-height:1.35;color:#0f172a;border-bottom:2px solid #eef2f6;padding-bottom:15px}h2{font-size:1.35rem;margin-top:30px;border-left:4px solid #3b82f6;padding-left:10px}p,li{color:#475569}code{background:#f1f5f9;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere;color:#be123c}pre{background:#1e293b;color:#e2e8f0;padding:15px;border-radius:6px;overflow-x:auto}pre code{background:none;color:inherit;padding:0}.note{background:#fff7ed;border-left:4px solid #f97316;padding:12px 16px}@media(max-width:600px){body{padding:0}.container{padding:24px 18px}h1{font-size:1.65rem}}
+    </style>
+</head>
+<body>
+<main class="container">
+    <a class="back-link" href="index.html">← 返回 Pikachu 首页</a>
+    <h1>Pikachu - CSRF（GET）</h1>
+    <p>分类：Web / CSRF · 环境：本机 Pikachu 靶场 · 题目路径：Cross-site request forgery → CSRF(get)</p>
+    <p class="note">仅在自己部署的 <code>127.0.0.1</code> 靶场练习。示例只修改测试账号资料，不针对任何真实站点。</p>
+
+    <h2>一、正常流程</h2>
+    <p>打开 <code>/pikachu/vul/csrf/csrfget/csrf_get_login.php</code>，使用题目提示的测试账号登录。登录后进入 <code>csrf_get.php</code>，点击“修改个人信息”进入 <code>csrf_get_edit.php</code>。</p>
+
+    <h2>二、源码与成因</h2>
+    <p>编辑表单使用 GET 提交：</p>
+    <pre><code>&lt;form method="get"&gt;
+  &lt;input name="sex"&gt;
+  &lt;input name="phonenum"&gt;
+  &lt;input name="add"&gt;
+  &lt;input name="email"&gt;
+  &lt;input type="submit" name="submit"&gt;
+&lt;/form&gt;</code></pre>
+    <p>服务端只检查当前 Session 是否登录，然后直接使用 GET 参数更新当前用户资料，没有 CSRF Token、Origin/Referer 校验或再次确认。</p>
+
+    <h2>三、构造请求</h2>
+    <p>登录状态存在时，可把正常编辑请求改造成链接：</p>
+    <pre><code>http://127.0.0.1/pikachu/vul/csrf/csrfget/csrf_get_edit.php?sex=boy&amp;phonenum=10000000000&amp;add=csrf-test&amp;email=csrf%40example.test&amp;submit=submit</code></pre>
+    <p>诱导仍处于登录状态的用户访问该 URL，浏览器会自动携带当前 Session Cookie，服务器便会把请求识别为该用户自己的修改操作。</p>
+
+    <h2>四、漏洞判断</h2>
+    <ul>
+        <li>攻击者不需要知道受害者的密码或 Session 值。</li>
+        <li>攻击者只需构造一个可访问的 GET 链接。</li>
+        <li>用户未登录或 Session 已失效时，请求会被重定向到登录页。</li>
+        <li>GET 被用于有副作用的更新操作，是本题最直观的风险信号。</li>
+    </ul>
+
+    <h2>五、修复思路</h2>
+    <p>修改资料应使用 POST，并为每个会话生成不可预测且一次性的 CSRF Token；服务端验证 Token 后再执行更新。还应设置合适的 SameSite Cookie，并校验 Origin/Referer 作为额外防线。仅把 GET 改成 POST 不能单独解决 CSRF。</p>
+</main>
+</body>
+</html>
