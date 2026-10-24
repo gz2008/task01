@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu 全模块通关验收 Writeup - gz2008的技术博客</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: #f6f9fc;
+            color: #1e293b;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            line-height: 1.8;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 880px;
+            margin: auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .05);
+            padding: 40px;
+        }
+        .back-link { color: #2563eb; text-decoration: none; }
+        h1 {
+            margin: 20px 0;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eef2f6;
+            color: #0f172a;
+            font-size: 2rem;
+            line-height: 1.35;
+        }
+        h2 {
+            margin-top: 34px;
+            padding-left: 10px;
+            border-left: 4px solid #3b82f6;
+            font-size: 1.4rem;
+        }
+        h3 { margin-top: 26px; color: #1d4ed8; font-size: 1.1rem; }
+        p, li { color: #475569; }
+        code {
+            padding: 2px 5px;
+            border-radius: 4px;
+            background: #f1f5f9;
+            color: #be123c;
+            overflow-wrap: anywhere;
+        }
+        pre {
+            padding: 15px;
+            border-radius: 6px;
+            background: #1e293b;
+            color: #e2e8f0;
+            overflow-x: auto;
+        }
+        pre code { padding: 0; background: none; color: inherit; }
+        table {
+            width: 100%;
+            margin: 18px 0;
+            border-collapse: collapse;
+            font-size: .94rem;
+        }
+        th, td {
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #eff6ff; color: #1e3a8a; }
+        .note {
+            margin: 18px 0;
+            padding: 12px 16px;
+            border-left: 4px solid #f97316;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+        .success {
+            margin: 18px 0;
+            padding: 12px 16px;
+            border-left: 4px solid #22c55e;
+            background: #f0fdf4;
+            color: #166534;
+        }
+        .muted { color: #64748b; font-size: .92rem; }
+        @media (max-width: 600px) {
+            body { padding: 0; }
+            .container { padding: 24px 18px; }
+            h1 { font-size: 1.65rem; }
+            table { display: block; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+<main class="container">
+    <a class="back-link" href="index.html">← 返回 Pikachu 首页</a>
+    <h1>Pikachu 全模块通关验收总览：从参数边界到完整攻击链</h1>
+    <p>分类：Web / 综合复盘 · 环境：本机 Pikachu 靶场 · 日期：2026-10-24</p>
+    <div class="note">
+        本文只记录本机靶场中的授权测试。文章不包含真实会话、密码、Cookie、私钥或可复用的外部目标信息。
+        标记文件、越权测试用户和后台测试记录均在验证后清理。
+    </div>
+
+    <h2>一、验收结论</h2>
+    <p>
+        前 18 篇已经分别覆盖暴力破解、XSS、CSRF 和 6 类 SQL 注入。本轮把其余模块合并验收，
+        对靶场 <code>vul/</code> 下的 91 个 PHP 入口做了状态扫描：全部返回 200 或预期的 302，
+        没有出现 500 或其他异常状态。
+    </p>
+    <div class="success">
+        <strong>可验证攻击链：</strong>盲注、宽字节注入、HTTP 头注入、命令执行、代码执行、
+        LFI/RFI、任意文件下载、客户端/MIME 上传绕过、水平与垂直越权、目录遍历、敏感信息泄露、
+        PHP 反序列化、XXE、开放重定向、SSRF 以及 XSS 后台接收端均已得到实际回显或数据落库证据。
+    </div>
+    <p>
+        有两类页面本来就是用来展示防护措施的，不能为了“通关”而虚构绕过：
+        CSRF Token 会生成隐藏字段并参与服务端比较；<code>getimagesize()</code> 页面还检查后缀白名单，
+        本轮直接提交可执行扩展名会被拒绝。它们应作为“防护生效”记录，而不是漏洞成功记录。
+    </p>
+
+    <h2>二、模块覆盖与观测结果</h2>
+    <table>
+        <thead>
+        <tr><th>模块</th><th>根因</th><th>本轮观测证据</th></tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>布尔盲注</td>
+            <td>用户名直接拼接到 <code>SELECT</code></td>
+            <td>真条件返回 <code>your uid:</code>；假条件返回“不存在”</td>
+        </tr>
+        <tr>
+            <td>时间盲注</td>
+            <td>同一条查询可注入 <code>sleep()</code></td>
+            <td>同文案下响应约 2.25 秒，对照请求约 0.03 秒</td>
+        </tr>
+        <tr>
+            <td>宽字节注入</td>
+            <td>GBK 客户端编码与转义处理不一致</td>
+            <td><code>%df%27</code> 后的逻辑进入查询并返回指定行</td>
+        </tr>
+        <tr>
+            <td>HTTP 头注入</td>
+            <td><code>User-Agent</code> 未经转义写入 INSERT</td>
+            <td>请求头中的 <code>sleep(2)</code> 使响应约 2.06 秒</td>
+        </tr>
+        <tr>
+            <td>CSRF Token</td>
+            <td>页面生成 Token 并交给服务端比较</td>
+            <td>登录后编辑页存在隐藏 Token 字段；未发现可证明的绕过</td>
+        </tr>
+        <tr>
+            <td>RCE（ping）</td>
+            <td>地址被拼接到 <code>shell_exec()</code></td>
+            <td>命令分隔后输出 <code>PIKA_RCE_PING_OK</code></td>
+        </tr>
+        <tr>
+            <td>RCE（eval）</td>
+            <td>用户输入进入 <code>eval()</code></td>
+            <td>提交 echo 表达式后输出 <code>PIKA_RCE_EVAL_OK</code></td>
+        </tr>
+        <tr>
+            <td>本地文件包含</td>
+            <td><code>include</code> 直接拼接文件名</td>
+            <td>目录穿越后读取到 Windows <code>win.ini</code> 的 <code>[fonts]</code></td>
+        </tr>
+        <tr>
+            <td>远程文件包含</td>
+            <td><code>allow_url_include</code> 开启且未限制来源</td>
+            <td>靶场从本地回调服务获取内容并执行标记</td>
+        </tr>
+        <tr>
+            <td>不安全下载</td>
+            <td>下载路径直接拼接 <code>filename</code></td>
+            <td>下载响应返回应用配置文件源码</td>
+        </tr>
+        <tr>
+            <td>客户端上传校验</td>
+            <td>仅由浏览器 JavaScript 检查扩展名</td>
+            <td>跳过前端后文件落盘并由 PHP 解释器执行标记</td>
+        </tr>
+        <tr>
+            <td>服务端 MIME 校验</td>
+            <td>信任请求中的 Content-Type，文件名仍被保留</td>
+            <td>声明图片 MIME 后上传测试文件并执行标记</td>
+        </tr>
+        <tr>
+            <td><code>getimagesize()</code></td>
+            <td>声称做后缀、MIME、图片和大小检查</td>
+            <td>非图片内容被拒绝；当前配置未证明可直接执行</td>
+        </tr>
+        <tr>
+            <td>水平越权</td>
+            <td>会员查询信任 URL 中的 <code>username</code></td>
+            <td>以一个普通用户登录后可查询另一用户资料</td>
+        </tr>
+        <tr>
+            <td>垂直越权</td>
+            <td>管理入口只检查登录，不检查级别</td>
+            <td>低级别用户打开管理表单并成功创建测试会员</td>
+        </tr>
+        <tr>
+            <td>目录遍历</td>
+            <td><code>require</code> 直接拼接 <code>title</code></td>
+            <td>穿越目录后读取到系统文本文件</td>
+        </tr>
+        <tr>
+            <td>敏感信息泄露</td>
+            <td>前端注释暴露测试账号，客户端保存可预测认证值</td>
+            <td>登录响应写入用户名和密码哈希；文章不复现真实凭据</td>
+        </tr>
+        <tr>
+            <td>PHP 反序列化</td>
+            <td>序列化字符串直接进入 <code>unserialize()</code></td>
+            <td>可控属性被反序列化并原样输出到 HTML</td>
+        </tr>
+        <tr>
+            <td>XXE</td>
+            <td>解析 XML 时启用了外部实体</td>
+            <td>实体读取本地 <code>win.ini</code> 并回显</td>
+        </tr>
+        <tr>
+            <td>开放重定向</td>
+            <td><code>Location</code> 直接使用 URL 参数</td>
+            <td>响应返回指向外部域名的 302 <code>Location</code></td>
+        </tr>
+        <tr>
+            <td>SSRF（curl / file_get_contents）</td>
+            <td>服务端请求用户控制的 URL 或文件路径</td>
+            <td>两种实现都读取了本地回调服务；FGC 还读取了本地文件</td>
+        </tr>
+        <tr>
+            <td>XSS 后台</td>
+            <td>接收端使用跨域接口和可控反馈内容</td>
+            <td>Cookie 标记、键盘标记和钓鱼接收端均在管理页出现</td>
+        </tr>
+        </tbody>
+    </table>
+    <p class="muted">
+        旧文章中的更新/删除型 SQL 注入会产生数据破坏，本轮没有再次重复执行；第 13—18 篇保留了各自的历史验证过程。
+    </p>
+
+    <h2>三、关键利用链</h2>
+
+    <h3>1. SQL 注入：从报错到无回显</h3>
+    <p>
+        盲注页没有显示数据库错误，返回页面只区分“查到一行”和“没查到”。
+        因此先构造真假条件，再用响应时间验证可执行表达式：
+    </p>
+    <pre><code>name=vince' and substr(database(),1,7)='pikachu'--
+name=vince' and substr(database(),1,7)='wrong'--
+name=vince' and if(substr(database(),1,7)='pikachu',sleep(2),0)--
+submit=查询</code></pre>
+    <p>
+        宽字节页面先把输入交给转义函数，再把数据库客户端字符集切换为 GBK。
+        攻击者提交的 <code>%df%27</code> 会被合并为特殊字节序列，使闭合引号恢复为 SQL 语法：
+    </p>
+    <pre><code>name=%df%27 union select 1,2%23
+submit=查询</code></pre>
+    <p>
+        HTTP 头页面把 <code>User-Agent</code> 写进 INSERT。把第三个字段闭合后插入时间表达式：
+    </p>
+    <pre><code>User-Agent: pika',sleep(2),'audit') --
+
+GET /pikachu/vul/sqli/sqli_header/sqli_header.php</code></pre>
+    <p>
+        上述路径的共同根因都是“数据被拼成 SQL 语法”。只转义引号并不够；
+        正确做法是参数化查询，并让字符集在连接建立时保持一致。
+    </p>
+
+    <h3>2. 命令执行与代码执行</h3>
+    <p>
+        ping 页面执行的是字符串拼接后的系统命令。把目标地址和后续命令分开后，
+        可以看到命令注入的明确回显：
+    </p>
+    <pre><code>ipaddress=127.0.0.1&amp; echo PIKA_RCE_PING_OK
+submit=ping</code></pre>
+    <p>
+        eval 页面则把输入当成 PHP 语句执行。验证时只输出固定标记，不读取文件、不建立连接：
+    </p>
+    <pre><code>txt=echo 'PIKA_RCE_EVAL_OK';
+submit=提交</code></pre>
+    <p>
+        结论不是“过滤几个符号”，而是禁止把用户输入放进 shell 或动态代码；
+        使用参数数组调用外部程序，并彻底移除动态 eval。
+    </p>
+
+    <h3>3. 文件包含、下载与上传</h3>
+    <p>
+        本地文件包含入口会把 <code>filename</code> 直接交给 include。
+        在本机 Windows 环境中，目录穿越可以读到系统文本文件：
+    </p>
+    <pre><code>filename=../../../../../../Windows/win.ini
+submit=submit</code></pre>
+    <p>
+        远程文件包含则把同一个参数交给 HTTP。用一个仅返回固定标记的本地回调服务，
+        可以观察到靶场确实代用户发起了请求并处理了返回内容：
+    </p>
+    <pre><code>filename=http://127.0.0.1:18080/rfi
+submit=submit</code></pre>
+    <p>
+        不安全下载用 <code>download/</code> 作为前缀，但没有规范化最终路径。
+        穿越后可以通过附件响应读取配置文件：
+    </p>
+    <pre><code>GET /pikachu/vul/unsafedownload/execdownload.php
+filename=../../../inc/config.inc.php</code></pre>
+    <p>
+        客户端上传页面只有浏览器端扩展名检查，拦截或重放请求即可绕过。
+        服务端 MIME 页面只相信请求声明的 Content-Type，并保留原始文件名。
+        测试文件只输出固定标记，验证后已立即删除：
+    </p>
+    <pre><code>Content-Type: image/png
+filename: local-marker
+body: &lt;?php echo 'PIKA_UPLOAD_OK'; ?&gt;</code></pre>
+    <p>
+        <code>getimagesize()</code> 页面应先确认后缀为 jpg/jpeg/png，再校验 MIME、真实图片和大小。
+        本轮使用真正图片测试时，使用可执行扩展名会被后缀白名单拒绝，因此不把该关写成 RCE。
+        即使图片校验存在缺陷，也必须配合上传目录执行、解析器差异或后续文件包含才可能扩大影响。
+    </p>
+    <div class="note">
+        本地测试中生成的标记上传物已删除，避免靶场长期保留可执行测试文件。
+    </div>
+
+    <h3>4. 越权与身份边界</h3>
+    <p>
+        op1 只确认当前用户已登录，却把查询对象交给 URL 参数
+        <code>username</code>。替换参数即可从一个账户读取另一个账户的资料，这是水平越权。
+    </p>
+    <pre><code>GET /pikachu/vul/overpermission/op1/op1_mem.php
+username=kobe
+submit=点击查看个人信息</code></pre>
+    <p>
+        op2 的普通用户能直接打开管理编辑页。服务端只检查
+        <code>check_op2_login()</code>，没有再次校验 <code>level == 1</code>；
+        本轮以低级别用户提交管理表单，数据库出现测试用户后再清理。
+    </p>
+    <p>
+        修复原则是服务端从会话中取得当前主体，并在每一次对象访问或功能调用时同时检查
+        “是谁”和“是否有权限”，而不是信任隐藏字段、URL 或前端菜单。
+    </p>
+
+    <h3>5. 解析器与数据信任</h3>
+    <p>
+        目录遍历把 <code>title</code> 直接拼到 <code>require "soup/$filename"</code>。
+        文件包含与目录遍历的实质相同：边界检查应发生在路径规范化之后，
+        并使用固定文件列表或安全的基目录约束。
+    </p>
+    <p>
+        PHP 反序列化页面允许客户端控制对象属性，随后把属性回显到 HTML：
+    </p>
+    <pre><code>O:1:"S":1:{s:4:"test";s:25:"&lt;script&gt;alert(1)&lt;/script&gt;";}</code></pre>
+    <p>
+        XXE 页面在解析 XML 时启用了外部实体。把实体指向本机文本文件，
+        响应中的结果证明实体被展开：
+    </p>
+    <pre><code>&lt;?xml version="1.0"?&gt;
+&lt;!DOCTYPE ANY [&lt;!ENTITY f SYSTEM "file:///C:/Windows/win.ini"&gt;]&gt;
+&lt;x&gt;&amp;f;&lt;/x&gt;</code></pre>
+    <p>
+        对应修复分别是：不使用用户输入选择文件；不在业务对象上调用不可信的反序列化；
+        解析 XML 时禁用 DTD 和外部实体。
+    </p>
+
+    <h3>6. 客户端与网络侧信任</h3>
+    <p>
+        开放重定向接口把 <code>url</code> 原样放入 <code>Location</code>。
+        测试使用不属于任何真实目标的示例域名，只观察 302 响应，不跟随跳转。
+    </p>
+    <pre><code>GET /pikachu/vul/urlredirect/urlredirect.php?url=https%3A%2F%2Fexample.com%2F</code></pre>
+    <p>
+        SSRF 的两种实现分别使用 curl 和 <code>file_get_contents()</code>。
+        本地回调服务返回固定字符串，证明请求由靶场服务器而非浏览器发出；
+        file 包装器测试则证明输入可以访问本地文件。生产环境应使用目标域名白名单、
+        DNS 解析后地址校验、协议限制和重定向后的二次校验。
+    </p>
+
+    <h3>7. XSS 后台接收端</h3>
+    <p>
+        对 Cookie 收集、键盘记录和钓鱼结果接收端分别提交了不含真实凭据的测试标记，
+        登录管理后台后三组标记都出现在对应列表中，随后通过数据库清理。
+        这说明前端漏洞一旦能在受害者浏览器中执行，就可能把当前页面的数据带到攻击者的收集端。
+    </p>
+    <p>
+        本地版本中，钓鱼中转页和键盘脚本保留了上游写死的回调地址，因此浏览器端的完整跳转链
+        需要改成当前实验地址后才能运行；接收端的写入和读取逻辑已经单独验证。
+        这不影响对漏洞根因的判断，但不能把未完成的前端跳转写成成功。
+    </p>
+
+    <h2>四、修复优先级</h2>
+    <table>
+        <thead>
+        <tr><th>风险面</th><th>最低限度修复</th></tr>
+        </thead>
+        <tbody>
+        <tr><td>SQL 注入</td><td>全部改为参数化查询；字符集固定为 UTF-8；停止拼接表名和列名</td></tr>
+        <tr><td>命令 / 代码执行</td><td>使用参数数组调用进程；禁止把输入交给 shell；移除动态 eval</td></tr>
+        <tr><td>文件操作</td><td>路径规范化、固定基目录、白名单、禁止远程 include、下载使用映射 ID</td></tr>
+        <tr><td>上传</td><td>服务端验证真实格式和大小；随机文件名与安全扩展名；上传目录禁止脚本执行</td></tr>
+        <tr><td>越权</td><td>会话绑定主体；对象级和功能级双重授权；服务端校验角色级别</td></tr>
+        <tr><td>反序列化 / XML</td><td>不接受客户端对象；使用 JSON；禁用 DTD 和外部实体</td></tr>
+        <tr><td>URL / SSRF</td><td>重定向只允许相对路径；SSRF 使用协议、域名和解析后 IP 白名单</td></tr>
+        <tr><td>XSS</td><td>按输出上下文编码；富文本使用白名单清洗；敏感 Cookie 使用 HttpOnly 和 SameSite</td></tr>
+        </tbody>
+    </table>
+
+    <h2>五、复盘与资料</h2>
+    <p>
+        Pikachu 的关卡数量并不等于漏洞数量。真正需要掌握的是几个可复用的判断：
+        用户输入最终进入了什么解释器；信任边界是在浏览器、服务端、数据库还是文件系统；
+        当前响应能提供什么证据；以及一次利用能否被拆成更小的可验证原语。
+    </p>
+    <p>
+        暴力破解、XSS、CSRF 和 SQL 注入的逐题过程仍保留在
+        <a href="index.html">Pikachu 文章索引</a>的 task01—task18。
+        本页作为关卡编号之外的总览，记录剩余模块的验收、防护边界和整场复盘。
+    </p>
+    <div class="success">
+        本地验收完成：91 个 <code>vul/</code> PHP 入口无异常状态；攻击链获得实际回显；
+        防护型关卡没有被伪造为绕过；测试数据与上传物已清理。
+    </div>
+</main>
+</body>
+</html>

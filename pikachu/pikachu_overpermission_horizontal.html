@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pikachu 越权 水平越权 Writeup - gz2008的技术博客</title>
+    <style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        padding: 40px 20px;
+        color: #1e293b;
+        background: #f6f9fc;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+        line-height: 1.8;
+    }
+    .container {
+        max-width: 800px;
+        margin: auto;
+        padding: 40px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, .05);
+    }
+    .back-link { color: #2563eb; text-decoration: none; }
+    h1 {
+        margin: 20px 0;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #eef2f6;
+        color: #0f172a;
+        font-size: 2rem;
+        line-height: 1.35;
+    }
+    h2 {
+        margin-top: 30px;
+        padding-left: 10px;
+        border-left: 4px solid #3b82f6;
+        font-size: 1.3rem;
+    }
+    p, li { color: #475569; }
+    code {
+        padding: 2px 5px;
+        border-radius: 4px;
+        background: #f1f5f9;
+        color: #be123c;
+        overflow-wrap: anywhere;
+    }
+    pre {
+        padding: 15px;
+        border-radius: 6px;
+        background: #1e293b;
+        color: #e2e8f0;
+        overflow-x: auto;
+    }
+    pre code { padding: 0; background: none; color: inherit; }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { background: #eff6ff; color: #1e3a8a; }
+    .note {
+        margin: 18px 0;
+        padding: 12px 16px;
+        border-left: 4px solid #f97316;
+        background: #fff7ed;
+        color: #9a3412;
+    }
+    .success {
+        margin: 18px 0;
+        padding: 12px 16px;
+        border-left: 4px solid #22c55e;
+        background: #f0fdf4;
+        color: #166534;
+    }
+    @media (max-width: 600px) {
+        body { padding: 0; }
+        .container { padding: 24px 18px; }
+        h1 { font-size: 1.65rem; }
+        table { display: block; overflow-x: auto; }
+    }
+</style>
+</head>
+<body>
+<main class="container">
+    <a class="back-link" href="index.html">← 返回 Pikachu 首页</a>
+    <h1>Pikachu - 越权 水平越权</h1>
+    <p>分类：Web / Access Control / IDOR · 环境：本机 Pikachu 靶场 · 题目路径：Over Permission → 水平越权</p>
+    <div class="note">本文只记录本地授权靶场验证，不针对任何外部系统。会话、Cookie、数据库凭据和真实业务数据均已省略。</div>
+
+    <h2>一、功能观察</h2>
+    <p>普通用户登录后，会员中心通过 username 参数查询资料。</p>
+
+    <h2>二、漏洞成因与验证思路</h2>
+    <p>服务端只验证会话有效，没有确认 username 是否就是当前登录用户。</p>
+    <pre><code>以普通用户登录后：
+GET /pikachu/vul/overpermission/op1/op1_mem.php
+username=kobe
+submit=点击查看个人信息</code></pre>
+    <div class="success">页面显示目标用户的姓名、性别、手机、地址和邮箱，说明读取了另一个对象。</div>
+
+    <h2>三、影响</h2>
+    <p>攻击者可枚举其他用户资料，形成批量隐私泄露。</p>
+
+    <h2>四、修复建议</h2>
+    <p>从会话取得当前用户 ID；对象访问时绑定主体，禁止由客户端决定查询对象。</p>
+
+    <h2>五、复盘</h2>
+    <p>本关的关键不是记住单个字符串，而是确认输入经过的边界：它进入的是 SQL、Shell、文件系统、HTML 还是 URL 处理器。根因确认后，最小验证应聚焦一个可观察结果，再决定是否需要升级利用链。</p>
+</main>
+</body>
+</html>
