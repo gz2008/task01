@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-01 前端校验绕过 Writeup - gz2008的技术博客</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+
+    <h1>Upload-Labs Pass-01：前端扩展名校验绕过</h1>
+    <div class="tags">
+      <span class="tag"># Upload-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># File Upload</span>
+      <span class="tag"># PHP</span>
+    </div>
+
+    <p>本文记录本机授权靶场 <code>http://127.0.0.1:8080/Pass-01/</code> 的解题过程。关卡目标是向服务器上传一个可执行的 PHP 文件，并确认上传目录允许脚本解析。</p>
+
+    <h2>一、实验信息</h2>
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>靶场</td><td>Upload-Labs</td></tr>
+      <tr><td>关卡</td><td>Pass-01</td></tr>
+      <tr><td>漏洞类型</td><td>客户端文件类型校验绕过</td></tr>
+      <tr><td>入口</td><td><code>/Pass-01/index.php</code></td></tr>
+      <tr><td>验证目标</td><td>上传 PHP 文件并访问执行</td></tr>
+    </table>
+
+    <h2>二、功能观察</h2>
+    <p>页面要求选择一张图片上传。直接选择 PHP 文件时，浏览器会提示扩展名不在白名单内；这说明表单提交前存在校验。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass01_page.png" alt="Upload-Labs Pass-01 上传页面">
+      <figcaption>Pass-01 页面只提供图片上传控件。</figcaption>
+    </figure>
+
+    <p>查看页面源码，可以看到表单通过 <code>onsubmit="return checkFile()"</code> 调用 JavaScript 校验函数。函数只提取最后一个点之后的扩展名，并检查它是否属于 <code>.jpg</code>、<code>.png</code> 或 <code>.gif</code>：</p>
+
+    <pre><code>function checkFile() {
+    var file = document.getElementsByName('upload_file')[0].value;
+    var allow_ext = ".jpg|.png|.gif";
+    var ext_name = file.substring(file.lastIndexOf("."));
+
+    if (allow_ext.indexOf(ext_name) == -1) {
+        alert("该文件不允许上传");
+        return false;
+    }
+}</code></pre>
+
+    <h2>三、根因分析</h2>
+    <p>关键问题是校验发生在浏览器中，而浏览器代码完全由请求方控制。用户可以关闭该站点的 JavaScript、修改校验函数，或者绕过表单直接发送 HTTP 请求。只要服务端不再验证，文件就能进入后端保存流程。</p>
+
+    <p>检查关卡 PHP 源码后，后端直接使用客户端提交的原始文件名，并将其移动到上传目录：</p>
+
+    <pre><code>$temp_file = $_FILES['upload_file']['tmp_name'];
+$img_path = UPLOAD_PATH . '/' . $_FILES['upload_file']['name'];
+
+if (move_uploaded_file($temp_file, $img_path)) {
+    $is_upload = true;
+}</code></pre>
+
+    <p>本关的 <code>UPLOAD_PATH</code> 是 <code>../upload</code>。上传目录能够通过 Web 访问，且其中的 <code>.php</code> 文件会交由 PHP 解析。因此，“前端只允许图片”和“后端接受原始文件名”共同形成了任意 PHP 文件上传。</p>
+
+    <h2>四、绕过与上传</h2>
+
+    <h3>方法一：禁用站点 JavaScript</h3>
+    <ol>
+      <li>为 <code>127.0.0.1:8080</code> 单独关闭 JavaScript。前端校验函数不会执行，表单仍可正常提交。</li>
+      <li>选择 PHP 文件并点击“上传”。</li>
+      <li>检查页面返回的图片地址，确认文件已经写入服务器。</li>
+    </ol>
+
+    <figure>
+      <img src="assets/upload_labs_pass01_js_disabled.png" alt="Edge 中为本地靶场单独禁用 JavaScript">
+      <figcaption>仅对本地靶场禁用 JavaScript，绕过 <code>checkFile()</code>。</figcaption>
+    </figure>
+
+    <p>上传后在开发者工具中可以看到，页面生成的图片节点指向服务器上的 PHP 路径。由于 PHP 不会返回图片内容，浏览器把它当作损坏图片显示，但路径本身已经证明上传成功。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass01_upload_path.png" alt="开发者工具显示 PHP 文件上传路径">
+      <figcaption>上传结果中的 <code>src="../upload/一句话木马.php"</code> 表明扩展名被原样保留。</figcaption>
+    </figure>
+
+    <div class="note">截图证明文件成功落盘，但损坏图片本身不能证明 PHP 已执行。下面使用只输出固定文字的无害测试文件补全执行验证。</div>
+
+    <h3>方法二：直接发送 multipart 请求</h3>
+    <p>创建只输出固定标记的 <code>safe-marker.php</code>。该文件不读取参数，也不执行系统命令：</p>
+
+    <pre><code>&lt;?php echo "SAFE_MARKER_OK"; ?&gt;</code></pre>
+
+    <p>不经过浏览器表单，直接向关卡提交文件。请求中的 <code>type=image/png</code> 只是用于模拟图片请求，本关后端并不校验这个字段：</p>
+
+    <pre><code>curl -sS \
+  -F "upload_file=@safe-marker.php;filename=safe-marker.php;type=image/png" \
+  -F "submit=上传" \
+  http://127.0.0.1:8080/Pass-01/index.php</code></pre>
+
+    <p>响应中返回实际的保存路径：</p>
+
+    <pre><code>src="../upload/safe-marker.php"</code></pre>
+
+    <h2>五、执行验证</h2>
+    <p>访问上传文件：</p>
+
+    <pre><code>curl -sS http://127.0.0.1:8080/upload/safe-marker.php</code></pre>
+
+    <p>返回结果：</p>
+
+    <pre><code>SAFE_MARKER_OK</code></pre>
+
+    <div class="success">固定标记被正常输出，证明上传、保存和 PHP 解析三个环节全部成功。此关没有单独的 Flag，验证目标就是获得可执行的 PHP 文件。</div>
+
+    <h2>六、影响与修复</h2>
+    <p>任意文件上传一旦与可执行脚本扩展名、可访问的上传目录和脚本解析权限组合，就可能进一步导致服务器代码执行、敏感文件读取、持久化或横向移动。</p>
+
+    <ul>
+      <li>服务端必须重新执行扩展名白名单校验，不能依赖前端 JavaScript。</li>
+      <li>使用 <code>finfo_file()</code> 或图像解码函数检查真实类型，不信任请求中的 <code>Content-Type</code>。</li>
+      <li>由服务端生成随机文件名，并根据验证结果强制设置安全扩展名。</li>
+      <li>将上传文件移出 Web 根目录，或关闭上传目录中的脚本执行权限。</li>
+      <li>限制文件大小、权限和保存路径，并对图片重新编码以去除多余内容。</li>
+    </ul>
+
+    <h2>七、复盘</h2>
+    <p>Pass-01 的检查对象不是某个复杂 Payload，而是信任边界：扩展名限制只存在于客户端，后端却直接信任用户提供的文件名。验证时先确认“文件是否落盘”，再通过无害标记确认“服务端是否解析”，两个结论分开记录，才能避免把损坏图片误判为代码执行成功。</p>
+  </main>
+</body>
+</html>
