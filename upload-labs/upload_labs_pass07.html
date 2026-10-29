@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-07 扩展名尾随空格绕过 Writeup - gz2008的技术博客</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+
+    <h1>Upload-Labs Pass-07：扩展名尾随空格绕过</h1>
+    <div class="tags">
+      <span class="tag"># Upload-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># File Upload</span>
+      <span class="tag"># Burp Suite</span>
+      <span class="tag"># Trailing Space</span>
+    </div>
+
+    <p>本文记录本机授权靶场 <code>http://127.0.0.1:8081/Pass-07/index.php</code> 的实验过程。Pass-07 对扩展名执行小写化并查询黑名单，但没有清理扩展名末尾的空格；在 <code>.php</code> 后追加一个 ASCII 空格后，校验得到的值是 <code>.php </code>，因此不会命中黑名单里的 <code>.php</code>。</p>
+
+    <h2>一、实验信息</h2>
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>靶场</td><td>Upload-Labs</td></tr>
+      <tr><td>关卡</td><td>Pass-07</td></tr>
+      <tr><td>漏洞类型</td><td>扩展名过滤未规范化，利用尾随空格绕过</td></tr>
+      <tr><td>工具</td><td>浏览器、Burp Suite、WSL、curl</td></tr>
+      <tr><td>运行环境</td><td>Linux / WSL 中的 PHP 8.4 内置服务器</td></tr>
+      <tr><td>验证结果</td><td>上传校验绕过并成功落盘；本机未确认 PHP 代码执行</td></tr>
+    </table>
+
+    <h2>二、功能观察</h2>
+    <p>页面目标是把一个 <code>webshell</code> 上传到服务器，表单中的文件字段名为 <code>upload_file</code>。使用普通文件名 <code>一句话木马.php</code> 时，服务端返回“此文件不允许上传”，说明黑名单可以直接识别常规 PHP 扩展名。</p>
+
+    <p>开启 Burp 拦截后重新提交，在 multipart 请求的 <code>Content-Disposition</code> 中可以看到客户端可控的文件名。下图保留了关键请求区域与响应区域：请求文件名在 <code>.php</code> 后追加了一个空格，响应页随后生成了指向新文件的图片框。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass07_request.png" alt="Burp Repeater 中给 PHP 扩展名追加空格后上传 Pass-07">
+      <figcaption>文件名字段为 <code>一句话木马.php </code>，其中 <code>.php</code> 后保留了一个 ASCII 尾随空格。</figcaption>
+    </figure>
+
+    <h2>三、请求构造</h2>
+    <p>复现时可使用一个只输出固定标记的无副作用 PHP 文件，避免在发布材料中保存可复用木马。请求中的文件名是第一个关键点：</p>
+
+    <pre><code>POST /Pass-07/index.php HTTP/1.1
+Host: 127.0.0.1:8081
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryEXAMPLE
+
+------WebKitFormBoundaryEXAMPLE
+Content-Disposition: form-data; name="upload_file"; filename="pass07_probe.php "
+Content-Type: application/octet-stream
+
+&lt;?php echo "PASS07_UPLOAD_OK"; ?&gt;
+------WebKitFormBoundaryEXAMPLE
+Content-Disposition: form-data; name="submit"
+
+上传
+------WebKitFormBoundaryEXAMPLE--</code></pre>
+
+    <div class="note"><code>filename="pass07_probe.php "</code> 的双引号内确有一个 ASCII 空格。编辑器保存后可能不容易直接看见，复现时建议用十六进制视图检查 <code>2e 70 68 70 20</code> 是否对应 <code>.php </code>。</div>
+
+    <h2>四、漏洞定位</h2>
+    <p>点击“显示源码”可以看到本关核心逻辑：</p>
+
+    <pre><code>$deny_ext = array(".php", ".php5", ".php4", ..., ".ini");
+$file_name = $_FILES['upload_file']['name'];
+$file_name = deldot($file_name); // 删除文件名末尾的点
+$file_ext = strrchr($file_name, '.');
+$file_ext = strtolower($file_ext);
+$file_ext = str_ireplace('::$DATA', '', $file_ext);
+
+if (!in_array($file_ext, $deny_ext)) {
+    $img_path = UPLOAD_PATH.'/'.date("YmdHis").rand(1000,9999).$file_ext;
+    move_uploaded_file($_FILES['upload_file']['tmp_name'], $img_path);
+}</code></pre>
+
+    <p>对文件名 <code>一句话木马.php </code>，处理链如下：</p>
+
+    <table>
+      <tr><th>阶段</th><th>结果</th></tr>
+      <tr><td><code>deldot()</code></td><td>只处理末尾的点，不清理末尾空格</td></tr>
+      <tr><td><code>strrchr()</code></td><td>提取出 <code>.php </code>，空格仍是扩展名的一部分</td></tr>
+      <tr><td><code>strtolower()</code></td><td>结果仍是 <code>.php </code></td></tr>
+      <tr><td><code>in_array()</code></td><td><code>.php </code> 与 <code>.php</code> 不相等，检查放行</td></tr>
+      <tr><td>落盘路径</td><td>随机文件名后拼接 <code>.php </code>，尾随空格被保留</td></tr>
+    </table>
+
+    <p>问题的本质是“用于判断的字符串”和“最终落盘的字符串”没有统一规范化。小写转换只处理了大小写，没有执行 <code>trim()</code>，也没有从服务端白名单重新生成安全扩展名。</p>
+
+    <h2>五、验证结果与环境差异</h2>
+    <p>本次请求成功绕过了上传校验。WSL 文件系统中实际生成的文件为：</p>
+
+    <pre><code>/home/ctf/labs/upload-labs/upload/202610290153475586.php </code></pre>
+
+    <p>使用 <code>stat</code> 可以看到文件大小为 32 字节，文件名的结尾空格也确实存在。通过 URL 编码访问该路径：</p>
+
+    <pre><code>curl.exe -sS -i "http://127.0.0.1:8081/upload/202610290153475586.php%20"</code></pre>
+
+    <p>响应状态为 <code>200 OK</code>，但返回内容是 PHP 源码，而不是脚本执行结果。进一步检查也没有得到固定的执行标记。因此本机可以确认：</p>
+
+    <ul>
+      <li>黑名单校验已被尾随空格绕过。</li>
+      <li>文件已成功写入 Web 可访问的 <code>upload/</code> 目录。</li>
+      <li>Linux 下的 PHP 内置服务器没有把 <code>.php </code> 识别为 PHP 处理器扩展名。</li>
+    </ul>
+
+    <div class="note">经典 Upload-Labs 场景常部署在 Windows 上。Windows 文件系统创建路径时会规范化尾随空格，因此 <code>.php </code> 可能实际落盘为 <code>.php</code>，随后被 PHP 执行。当前实验使用 Linux/WSL，文件名中的空格被保留，所以不能把“经典环境中的预期效果”写成“本机已经验证 RCE”。</div>
+
+    <table>
+      <tr><th>环境</th><th>落盘文件名</th><th>观察结果</th></tr>
+      <tr><td>Windows 经典靶场</td><td>尾随空格通常被文件系统规范化</td><td>校验绕过后可能由 <code>.php</code> 处理器执行，本例未在当前机器验证</td></tr>
+      <tr><td>本次 Linux / WSL</td><td><code>...php </code>，空格保留</td><td>文件可访问，但返回源码，未确认代码执行</td></tr>
+    </table>
+
+    <h2>六、实验文件清理</h2>
+    <p>验证结束后，只删除本次上传且带有尾随空格的文件：</p>
+
+    <pre><code>rm -- '/home/ctf/labs/upload-labs/upload/202610290153475586.php '</code></pre>
+
+    <p>删除后再次请求同一路径返回 <code>404 Not Found</code>，<code>upload/</code> 目录中只保留项目自带的 <code>readme.php</code>。这说明清理操作命中了本次测试文件，没有使用会删除全部上传内容的批量按钮。</p>
+
+    <h2>七、影响与修复</h2>
+    <p>尾随空格绕过使应用的黑名单判断与文件系统实际写入产生差异。若部署在会规范化尾随空格的平台，脚本就可能以可执行扩展名落盘，形成服务器端代码执行风险。</p>
+
+    <ul>
+      <li>不要依赖扩展名黑名单，改用固定的服务端白名单。</li>
+      <li>在比较前同时执行 <code>trim()</code>、路径分隔符清理和大小写统一，且对原始值与规范化值的差异直接拒绝。</li>
+      <li>忽略客户端文件名，由服务端生成随机文件名和固定安全扩展名。</li>
+      <li>检查 MIME、文件头与实际内容；图片应重新解码并编码。</li>
+      <li>将上传目录移出 Web 根目录，或在 Web 服务器层禁止该目录执行脚本。</li>
+    </ul>
+
+    <h2>八、复盘</h2>
+    <p>Pass-07 的绕过点不是空格本身，而是“过滤函数看到的扩展名”与“文件系统最终保存的扩展名”不一致。写报告时应把上传校验绕过、文件落盘、HTTP 可访问和代码执行分别记录；本次在本机只验证了前三项中的前两项，并为第三项明确标记了环境限制。</p>
+  </main>
+</body>
+</html>
