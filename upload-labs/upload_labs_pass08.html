@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-08 尾随点号绕过 Writeup - gz2008的技术博客</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+
+    <h1>Upload-Labs Pass-08：尾随点号扩展名绕过</h1>
+    <div class="tags">
+      <span class="tag"># Upload-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># File Upload</span>
+      <span class="tag"># Burp Suite</span>
+      <span class="tag"># Trailing Dot</span>
+    </div>
+
+    <p>Pass-08 继续使用扩展名黑名单，但在比较前会分别清理完整文件名和扩展名两端的空白。若文件名写成 <code>probe.php.</code>，<code>strrchr()</code> 取到的最后一段扩展名只是一个点号 <code>.</code>，不会命中黑名单中的 <code>.php</code>。本文会在本机授权靶场中分别验证过滤绕过、文件落盘、HTTP 可访问和代码执行，避免把一次成功上传直接等同于命令执行。</p>
+
+    <h2>一、实验信息</h2>
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>靶场</td><td>Upload-Labs</td></tr>
+      <tr><td>关卡</td><td>Pass-08</td></tr>
+      <tr><td>漏洞类型</td><td>扩展名解析与黑名单规范化不一致</td></tr>
+      <tr><td>绕过文件名</td><td><code>probe.php.</code></td></tr>
+      <tr><td>工具</td><td>浏览器、Burp Suite、curl、Linux 文件工具</td></tr>
+      <tr><td>运行环境</td><td>WSL 中的 PHP 8.4 内置服务器</td></tr>
+      <tr><td>验证结果</td><td>黑名单绕过并成功落盘；Linux 下可访问源码，未确认 PHP 执行</td></tr>
+    </table>
+
+    <h2>二、功能观察</h2>
+    <p>页面要求上传 WebShell，文件字段名为 <code>upload_file</code>。普通 PHP 文件名会被服务端拒绝，说明前端虽然有 JavaScript 检查，但后端仍依赖扩展名黑名单。</p>
+
+    <p>使用 Burp Suite 拦截请求后，将 multipart 文件名修改为 <code>一句话木马.php.</code>，也就是在 <code>.php</code> 后再追加一个英文句点：</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass08_request.png" alt="Burp Repeater 中把 Pass-08 文件名改为 PHP 后缀加尾随点号">
+      <figcaption>请求的 <code>filename</code> 以 <code>.php.</code> 结尾；需要在修改后重新点击发送，才能得到当前请求对应的响应。</figcaption>
+    </figure>
+
+    <h2>三、截图中的结果需要分开判断</h2>
+    <p>用户提供的第一张图里已经能看到尾随点号，但响应页仍显示“此文件类型不允许上传”；第二张浏览器截图也显示相同失败提示：</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass08_denied.png" alt="Pass-08 上传后页面仍提示文件类型不允许上传">
+      <figcaption>浏览器页面显示失败。单凭这两张截图，只能证明构造了带点号的文件名，不能证明黑名单已经被绕过。</figcaption>
+    </figure>
+
+    <div class="note">Burp Repeater 修改请求后必须重新发送。<code>请求编辑区里的文件名</code>、<code>当前显示的响应</code>和<code>浏览器页面上的上传结果</code>必须来自同一次请求，才能作为绕过成功的证据。</div>
+
+    <p>为了得到可复核结论，下面使用只输出固定文本的无副作用探针重新请求同一关卡。探针没有命令执行、文件管理或持久化功能。</p>
+
+    <h2>四、复现请求</h2>
+    <p>准备一个测试文件 <code>pass08_probe.php</code>：</p>
+
+    <pre><code>&lt;?php echo "PASS08_FILTER_BYPASS_OK"; ?&gt;</code></pre>
+
+    <p>使用 curl 发送 multipart 请求，并通过 <code>filename=</code> 明确保留尾随点号：</p>
+
+    <pre><code>curl -sS -i \
+  -F 'upload_file=@pass08_probe.php;filename=pass08_probe.php.' \
+  -F 'submit=上传' \
+  http://127.0.0.1:8081/Pass-08/index.php</code></pre>
+
+    <p>本次实际请求返回 <code>200 OK</code>，响应 HTML 中出现：</p>
+
+    <pre><code>&lt;img src="../upload/pass08_probe.php." width="250px" /&gt;</code></pre>
+
+    <p><code>$is_upload</code> 只有在 <code>move_uploaded_file()</code> 成功时才会变为真，因此这比单看页面文字更直接地证明文件已经落盘。</p>
+
+    <h2>五、漏洞定位</h2>
+    <p>Pass-08 的关键逻辑可以概括为：</p>
+
+    <pre><code>$deny_ext = array(".php", ".php5", ".phtml", ...);
+$file_name = trim($_FILES['upload_file']['name']);
+$file_ext = strrchr($file_name, '.');
+$file_ext = strtolower($file_ext);
+$file_ext = str_ireplace('::$DATA', '', $file_ext);
+$file_ext = trim($file_ext);
+
+if (!in_array($file_ext, $deny_ext)) {
+    $img_path = UPLOAD_PATH.'/'.$file_name;
+    move_uploaded_file($_FILES['upload_file']['tmp_name'], $img_path);
+}</code></pre>
+
+    <p>对 <code>pass08_probe.php.</code> 的处理过程如下：</p>
+
+    <table>
+      <tr><th>阶段</th><th>结果</th></tr>
+      <tr><td><code>trim($file_name)</code></td><td>完整文件名不变，仍为 <code>pass08_probe.php.</code></td></tr>
+      <tr><td><code>strrchr($file_name, '.')</code></td><td>从最后一个点开始截取，得到 <code>.</code></td></tr>
+      <tr><td><code>strtolower()</code> 与 <code>trim()</code></td><td>仍然是 <code>.</code></td></tr>
+      <tr><td><code>in_array()</code></td><td><code>.</code> 不在黑名单中，校验放行</td></tr>
+      <tr><td><code>move_uploaded_file()</code></td><td>使用原始文件名落盘，得到 <code>pass08_probe.php.</code></td></tr>
+    </table>
+
+    <p>根因不是点号本身能变成 PHP 扩展名，而是程序用“最后一个点后的内容”做安全判断，却又把“原始完整文件名”交给文件系统保存。判断值与落盘值不一致，过滤就能被尾随点号绕过。</p>
+
+    <h2>六、落盘与访问验证</h2>
+    <p>在靶场的上传目录中检查实际文件名：</p>
+
+    <pre><code>stat --printf='name=%n\nsize=%s\nmode=%A\n' \
+  /home/ctf/labs/upload-labs/upload/pass08_probe.php.</code></pre>
+
+    <p>文件存在，权限为普通可读文件。随后请求 URL：</p>
+
+    <pre><code>curl -sS -i \
+  http://127.0.0.1:8081/upload/pass08_probe.php.</code></pre>
+
+    <p>响应为 <code>200 OK</code>，内容为：</p>
+
+    <pre><code>&lt;?php echo "PASS08_FILTER_BYPASS_OK"; ?&gt;</code></pre>
+
+    <p>这说明文件位于 Web 根目录下并且可以直接访问，但 PHP 内置服务器只把常见的 <code>.php</code> 文件交给 PHP 解释器；尾随点号让扩展名成为 <code>.php.</code>，因此本次返回的是源码。</p>
+
+    <h2>七、Linux 与 Windows 的差异</h2>
+    <table>
+      <tr><th>环境</th><th>可能行为</th><th>本次验证</th></tr>
+      <tr><td>Linux / WSL</td><td>尾随点号通常原样保留</td><td>文件以 <code>.php.</code> 落盘，可读源码，未执行 PHP</td></tr>
+      <tr><td>Windows 文件系统</td><td>创建路径时可能规范化尾随点号</td><td>可能变成 <code>.php</code> 并被执行，本次未验证</td></tr>
+    </table>
+
+    <p>经典 Upload-Labs 常运行在 Windows 环境，因此尾随点号经常被用来同时绕过黑名单并借助文件系统规范化获得可执行后缀。但在 Linux 上不能直接套用这个结论。是否形成 RCE，要以实际上传后的文件名、Web 服务器扩展名映射和响应内容为准。</p>
+
+    <div class="success">本次最终结论：Pass-08 的扩展名黑名单已被 <code>probe.php.</code> 绕过，文件成功上传到 Web 可访问目录；当前 Linux/WSL 环境没有执行 PHP 代码，RCE 未验证。</div>
+
+    <h2>八、清理测试文件</h2>
+    <p>验证结束后只删除本次创建的探针文件：</p>
+
+    <pre><code>rm -- /home/ctf/labs/upload-labs/upload/pass08_probe.php.</code></pre>
+
+    <p>再次访问该 URL 应返回 <code>404 Not Found</code>。清理时使用完整文件名，避免删除上传目录中的其他内容。</p>
+
+    <h2>九、修复建议</h2>
+    <ul>
+      <li>不要使用扩展名黑名单，改为明确的服务端白名单。</li>
+      <li>先规范化文件名，再把用于检查的扩展名和实际落盘扩展名统一；对尾随点号、空格、大小写变化直接拒绝。</li>
+      <li>忽略客户端文件名，由服务端生成随机文件名和固定安全扩展名。</li>
+      <li>同时检查 MIME、文件头和实际内容；图片应重新解码并编码，不能只改请求头。</li>
+      <li>将上传目录移出 Web 根目录，或在 Web 服务器层禁止该目录执行脚本。</li>
+    </ul>
+
+    <h2>十、复盘</h2>
+    <p>Pass-08 的核心是扩展名判断与文件保存规则不一致。点号可以让 <code>strrchr()</code> 得到无意义的扩展名 <code>.</code>，从而通过黑名单；后续能否执行则取决于文件系统是否规范化尾随点号以及 PHP 处理器如何映射扩展名。写报告时必须分别记录“绕过校验”“成功落盘”“HTTP 访问”“代码执行”，这样结论才可复核。</p>
+  </main>
+</body>
+</html>
