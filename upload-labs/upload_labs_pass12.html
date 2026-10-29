@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-12 白名单与 %00 截断复现边界 Writeup - gz2008的技术博客</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+
+    <h1>Upload-Labs Pass-12：白名单、路径参数与 %00 截断的复现边界</h1>
+    <div class="tags">
+      <span class="tag"># Upload-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># File Upload</span>
+      <span class="tag"># 白名单</span>
+      <span class="tag"># 00截断</span>
+      <span class="tag"># PHP</span>
+    </div>
+
+    <p>Pass-12 的扩展名检查确实是白名单，但它不只检查“是否允许上传图片”。真正危险的地方在于：程序用白名单验证客户端文件名，却用另一个由 GET 参数控制的 <code>save_path</code> 拼接最终保存路径。本文记录源码分析、实际请求，以及当前 PHP 8.4 环境下无法复现旧式 NUL 截断的原因。</p>
+
+    <h2>一、实验信息</h2>
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>靶场</td><td>Upload-Labs</td></tr>
+      <tr><td>关卡</td><td>Pass-12</td></tr>
+      <tr><td>目标</td><td><code>http://127.0.0.1:8081/Pass-12/index.php</code></td></tr>
+      <tr><td>漏洞类型</td><td>扩展名白名单与可控保存路径组合</td></tr>
+      <tr><td>请求字段</td><td>文件字段 <code>upload_file</code>，查询参数 <code>save_path</code></td></tr>
+      <tr><td>运行环境</td><td>Apache 2.4.68、PHP 8.4.24、Linux/WSL</td></tr>
+      <tr><td>当前结果</td><td>白名单可通过；携带 NUL 的保存路径返回 <code>500</code>，未生成 PHP 文件</td></tr>
+    </table>
+
+    <h2>二、源码与信任边界</h2>
+    <p>Pass-12 的核心代码可以简化如下：</p>
+
+    <pre><code>$ext_arr = array('jpg', 'png', 'gif');
+$file_ext = substr(
+    $_FILES['upload_file']['name'],
+    strrpos($_FILES['upload_file']['name'], ".") + 1
+);
+
+if (in_array($file_ext, $ext_arr)) {
+    $temp_file = $_FILES['upload_file']['tmp_name'];
+    $img_path = $_GET['save_path']
+              . "/"
+              . rand(10, 99)
+              . date("YmdHis")
+              . "."
+              . $file_ext;
+
+    move_uploaded_file($temp_file, $img_path);
+}</code></pre>
+
+    <p>这里有两个独立输入：</p>
+    <ul>
+      <li>客户端文件名：只用于提取最后一个扩展名，并执行白名单判断。</li>
+      <li><code>save_path</code>：直接参与最终文件系统路径拼接，没有做目录规范化或路径边界检查。</li>
+    </ul>
+
+    <p>因此，通过扩展名检查并不代表保存路径安全。白名单只回答“上传名最后是不是 jpg/png/gif”，并不回答“最终写入位置是否仍在上传目录内”。</p>
+
+    <h2>三、.php.png 为什么不是有效绕过</h2>
+    <p>第一次测试使用文件名 <code>一句话木马.php.png</code>。服务端读取最后一个点之后的文本，得到 <code>png</code>，于是通过白名单。但它随后仍会把最终名称拼接为随机数字、时间和扩展名：</p>
+
+    <pre><code>../upload/6620261029062835.png</code></pre>
+
+    <p>实际落盘文件为 32 字节，内容是 PHP 代码，但文件名仍是 <code>.png</code>。Apache 对该路径按静态图片处理，不会把其中的 PHP 代码交给解释器执行。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass12_double_extension.png" alt="Burp Repeater 中 Pass-12 使用 php.png 双扩展名并收到上传页面响应">
+      <figcaption>文件名 <code>.php.png</code> 可以通过白名单，但服务端最终仍使用 <code>.png</code> 保存。</figcaption>
+    </figure>
+
+    <div class="note">图片框出现、页面没有报错、文件成功落盘，都不等于 PHP 已执行。这里能够确认的是白名单被满足，不能确认 WebShell 可用。</div>
+
+    <h2>四、Pass-12 的经典利用链</h2>
+    <p>在旧版 PHP 中，经典思路是让上传文件名保持合法图片后缀，同时在 <code>save_path</code> 中插入 NUL 字节：</p>
+
+    <pre><code>POST /Pass-12/index.php?save_path=../upload/online.php%00 HTTP/1.1
+Content-Type: multipart/form-data; boundary=...
+
+--...
+Content-Disposition: form-data; name="upload_file"; filename="online.png"
+Content-Type: application/octet-stream
+
+&lt;?php echo "PASS12_PROBE"; ?&gt;
+--...--</code></pre>
+
+    <p>关键点不是把文件名改成 <code>.php</code>，而是让两个值分别满足不同阶段：</p>
+
+    <table>
+      <tr><th>字段</th><th>取值</th><th>作用</th></tr>
+      <tr><td>multipart 文件名</td><td><code>online.png</code></td><td>通过 jpg/png/gif 白名单</td></tr>
+      <tr><td><code>save_path</code></td><td><code>../upload/online.php%00</code></td><td>尝试让旧版 PHP 在 NUL 处截断后续随机文件名</td></tr>
+    </table>
+
+    <p>在 PHP 5.3.4 之前，文件系统函数可能把 NUL 当作字符串终止符。原路径会变成：</p>
+
+    <pre><code>../upload/online.php\x00/6620261029062835.png
+                       ↑ 旧版 PHP 可能在 NUL 处停止</code></pre>
+
+    <p>如果系统按这种语义处理，实际目标就只剩 <code>../upload/online.php</code>。这属于历史 PHP 行为；本文没有在当前环境复现出这一结果。</p>
+
+    <h3>%00、0x00 和 0*00 不是同一种输入</h3>
+    <ul>
+      <li><code>%00</code> 是 URL 编码，服务器解码后可以形成单字节 NUL。</li>
+      <li><code>0x00</code> 通常只是文档中表示十六进制字节的写法；直接发送字符 <code>0x00</code> 并不会生成 NUL。</li>
+      <li>字面量 <code>0*00</code> 同样只是普通字符，不具备路径截断语义。</li>
+    </ul>
+
+    <p>因此，只有真正解码为 <code>\x00</code> 的输入才与 NUL 截断有关；把“00”写成其他文本形式不会自动得到同样的效果。</p>
+
+    <h2>五、当前环境中的实际请求过程</h2>
+    <p>只修改 <code>save_path</code>、仍让 multipart 文件名为 <code>online.php</code> 时，服务端先返回扩展名白名单错误：</p>
+
+    <pre><code>只允许上传.jpg|.png|.gif类型文件！</code></pre>
+
+    <figure>
+      <img src="assets/upload_labs_pass12_whitelist_denied.png" alt="Pass-12 请求保存路径带有 00，但上传文件名仍为 php 被白名单拒绝">
+      <figcaption><code>save_path</code> 不是扩展名校验对象；上传文件名仍必须通过 jpg/png/gif 白名单。</figcaption>
+    </figure>
+
+    <p>将 multipart 文件名改成 <code>online.png</code> 后，白名单错误消失，请求进入 <code>move_uploaded_file()</code>。随后响应变为空白页，Burp 显示状态为 <code>500</code>。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass12_php84_500.png" alt="Pass-12 在 PHP 8.4 中使用 00 保存路径后返回 500 空白响应">
+      <figcaption>扩展名检查已通过；携带 NUL 的路径在 PHP 8.4 下触发服务器错误。</figcaption>
+    </figure>
+
+    <p>Apache 访问日志记录了这次结果：</p>
+
+    <pre><code>POST /Pass-12/index.php?save_path=../upload/oneline.php%00
+HTTP/1.1 500 2309</code></pre>
+
+    <p>检查上传目录后，没有出现本次请求对应的新 PHP 文件。由此可以确认：请求已经越过白名单检查，但保存阶段被当前 PHP 运行时拒绝。</p>
+
+    <h3>中文直接放入请求行的边界</h3>
+    <p>测试中曾把中文直接写进请求目标，Apache 返回 <code>400 Bad Request</code>。这一步发生在 PHP 业务逻辑之前，和 Pass-12 的白名单无关。构造 HTTP 请求时应使用 ASCII 文件名；如果确需中文，应进行规范的 URL 编码。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass12_unicode_400.png" alt="请求行直接包含中文导致 Apache 返回 400 Bad Request">
+      <figcaption>请求目标中的原始中文字节导致 Apache 无法解析，还没有进入 Pass-12 代码。</figcaption>
+    </figure>
+
+    <h2>六、为什么当前环境无法复现</h2>
+    <p>PHP 从 5.3.4 开始修复了文件系统路径中的 NUL 截断问题。当前靶场使用 PHP 8.4.24，包含空字节的路径会被拒绝，因此旧式 <code>%00</code> 利用链不再成立。</p>
+
+    <table>
+      <tr><th>运行环境</th><th>NUL 路径行为</th><th>Pass-12 旧式利用</th></tr>
+      <tr><td>PHP 5.2 / 5.3.3 等旧版本</td><td>历史实现可能在 NUL 处截断</td><td>具备复现条件</td></tr>
+      <tr><td>PHP 5.3.4 及以上</td><td>拒绝包含空字节的文件路径</td><td>旧式截断不可用</td></tr>
+      <tr><td>当前 PHP 8.4.24</td><td>本次实测返回 <code>500</code></td><td>未复现，未生成 PHP 文件</td></tr>
+    </table>
+
+    <p>本地 upload-labs 自带的 Dockerfile 使用 <code>php:5.5-apache</code>，同样已经高于 5.3.4，不能仅凭这个 Dockerfile 就认定 Pass-12 一定能按旧方式复现。若只想验证 NUL 截断本身，可以在隔离环境中使用 PHP 5.2 一类的旧版本；本站已有的 <a href="../ctfhub/ctfhub_file_upload_00truncation.html">CTFHub 文件上传 00 截断</a> 记录了 PHP 5.2.17 下的完整成功案例。</p>
+
+    <div class="note">现代 PHP 拒绝 NUL 只能消除这一种历史利用方式，不能修复 Pass-12 源码里“信任用户可控保存路径”的设计问题。实际应用中仍应检查目录穿越、路径规范化、文件覆盖和上传目录执行权限。</div>
+
+    <h2>七、漏洞价值与修复建议</h2>
+    <p>Pass-12 的具体 <code>%00</code> 技巧在现代 PHP 中价值很低，但“校验值”和“实际使用值”不一致仍是常见漏洞模型。安全修复应从最终路径出发，而不是只加强上传文件名的正则表达式。</p>
+
+    <ul>
+      <li>由服务端生成随机文件名和固定安全扩展名，不保留客户端文件名。</li>
+      <li>上传目录必须来自服务端固定配置，禁止通过请求参数控制。</li>
+      <li>保存前对路径做规范化，并使用真实路径比较确认目标仍位于允许目录内。</li>
+      <li>拒绝 NUL、换行、路径分隔符和平台特殊字符等异常输入。</li>
+      <li>将上传目录移到 Web 根目录之外，或在服务器层关闭脚本执行权限。</li>
+      <li>同时检查 MIME、文件头和真实文件内容；图片应重新解码和编码。</li>
+    </ul>
+
+    <h2>八、复盘结论</h2>
+    <p>Pass-12 属于白名单相关的上传题，但仅使用 <code>.php.png</code> 只能满足扩展名检查，最终仍会保存为图片。经典解法依赖可控的 <code>save_path</code> 与旧版 PHP 的 NUL 字符串截断；在本次 PHP 8.4.24 环境中，请求虽然越过了白名单，却在保存阶段返回 <code>500</code>，没有生成 PHP 文件。</p>
+
+    <div class="success">可确认事实：白名单逻辑、保存路径拼接和 PHP 8.4 拒绝 NUL 路径均已通过源码与请求日志验证。未确认事实：当前环境中没有获得 WebShell、命令执行或 Flag，因此本文不宣称 Pass-12 已被实际攻破。</div>
+  </main>
+</body>
+</html>
