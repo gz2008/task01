@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-21 MIME 与数组文件名绕过边界 Writeup - gz2008的技术博客</title>
+  <style>
+* { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+    <h1>Upload-Labs Pass-21：MIME 与数组文件名绕过边界</h1>
+    <div class="tags">
+      <span class="tag">Upload-Labs</span>
+      <span class="tag">Web</span>
+      <span class="tag">File Upload</span>
+      <span class="tag">MIME</span>
+      <span class="tag">数组绕过</span>
+    </div>
+<p>Pass-21 先信任客户端声明的 MIME，再允许 POST 的 <code>save_name</code> 覆盖保存名。代码对数组使用 <code>end()</code> 和 <code>reset()</code>，并通过 <code>count()</code> 计算最后一个元素。</p>
+
+    <div class="note"><strong>验证边界：</strong>当前 PHP 8.4/Linux 下，稀疏数组请求返回“文件上传成功”，实际生成 <code>pass21_probe.php.</code>。数组校验与拼接缺陷已复现，但尾随点没有被 Linux/Apache 当作 <code>.php</code> 执行。</div>
+
+    <h2>一、核心逻辑</h2>
+    <pre><code>$allow_type = array('image/jpeg', 'image/png', 'image/gif');
+if (!in_array($_FILES['upload_file']['type'], $allow_type)) {
+    $msg = "禁止上传该类型文件!";
+} else {
+    $file = empty($_POST['save_name'])
+          ? $_FILES['upload_file']['name']
+          : $_POST['save_name'];
+
+    if (!is_array($file)) {
+        $file = explode('.', strtolower($file));
+    }
+
+    $ext = end($file);
+    $allow_suffix = array('jpg', 'png', 'gif');
+    $file_name = reset($file) . '.' . $file[count($file) - 1];
+}</code></pre>
+    <p>两个信任边界同时存在：MIME 来自客户端，数组的键和长度也来自客户端。</p>
+
+    <h2>二、稀疏数组请求</h2>
+    <p>发送文件时使用合法 GIF MIME，并提交稀疏数组：</p>
+    <pre><code>upload_file = valid.gif
+upload_file[type] = image/gif
+
+save_name[0] = pass21_probe.php
+save_name[2] = gif</code></pre>
+    <p><code>end()</code> 看到 <code>gif</code>，扩展名白名单通过；<code>count()</code> 为 2，代码读取不存在的下标 1，最终名称成为 <code>pass21_probe.php.</code>。本次实测响应为：</p>
+    <pre><code>提示：文件上传成功！</code></pre>
+    <p>上传目录中的结果：</p>
+    <pre><code>pass21_probe.php.  81 bytes</code></pre>
+
+    <h2>三、为什么还没有形成执行</h2>
+    <p>Linux 把最后那个点当作文件名的一部分，不会像部分 Windows 路径处理那样自动去掉尾随点。Apache 的 PHP 规则要求路径以 <code>.php</code> 等后缀结束，因此 <code>pass21_probe.php.</code> 没有被直接交给 PHP。数组绕过与最终代码执行之间还存在平台处理差异。</p>
+
+    <h2>四、修复建议</h2>
+    <ul>
+      <li>拒绝数组输入，只接受单个受控字符串。</li>
+      <li>不信任客户端 MIME；检查真实内容和扩展名白名单。</li>
+      <li>服务端重新生成文件名，不使用 <code>save_name</code>。</li>
+      <li>拒绝尾随点、空格和控制字符，并校验规范化后的真实路径。</li>
+    </ul>
+
+    <h2>五、复盘</h2>
+    <p>Pass-21 比 Pass-20 更适合观察“部分成功”：请求确实越过了 MIME 和数组扩展名检查，也真实写出了带尾随点的文件；但当前平台没有把它映射为 PHP。把“上传成功”和“代码执行成功”分开记录，结论才可靠。</p>
+  </main>
+</body>
+</html>

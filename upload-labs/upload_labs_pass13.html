@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-13 POST save_path 与 NUL 截断边界 Writeup - gz2008的技术博客</title>
+  <style>
+* { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+    <h1>Upload-Labs Pass-13：POST save_path 与 NUL 截断边界</h1>
+    <div class="tags">
+      <span class="tag">Upload-Labs</span>
+      <span class="tag">Web</span>
+      <span class="tag">File Upload</span>
+      <span class="tag">路径参数</span>
+      <span class="tag">PHP 8.4</span>
+    </div>
+<p>Pass-13 先检查 multipart 文件名是否以 <code>jpg</code>、<code>png</code> 或 <code>gif</code> 结尾，然后把 POST 参数 <code>save_path</code> 和随机文件名拼接成最终路径。这里同样存在“校验值”和“实际使用值”分离的问题。</p>
+
+    <div class="note"><strong>验证边界：</strong>当前 PHP 8.4.24 下，带真实 NUL 字节的保存路径返回 HTTP 500，上传目录没有生成 PHP 文件。旧版 PHP 的截断效果没有被用来冒充当前环境的成功。</div>
+
+    <h2>一、源码与信任边界</h2>
+    <pre><code>$file_ext = substr($_FILES['upload_file']['name'],
+                    strrpos($_FILES['upload_file']['name'], ".") + 1);
+if (in_array($file_ext, array('jpg','png','gif'))) {
+    $img_path = $_POST['save_path']."/".rand(10, 99).date("YmdHis").".".$file_ext;
+    move_uploaded_file($_FILES['upload_file']['tmp_name'], $img_path);
+}</code></pre>
+    <p><code>save_path</code> 没有做目录规范化，也不要求必须位于上传目录内。经典利用依赖旧版 PHP 在 NUL 字节处终止字符串，使路径前缀变成类似 <code>../upload/pass13_probe.php</code>。</p>
+
+    <h2>二、当前环境复现</h2>
+    <p>测试在 multipart 的 <code>save_path</code> 值中放入真实 <code>0x00</code>，文件部分仍使用合法 PNG 名称：</p>
+    <pre><code>save_path = ../upload/pass13_probe.php + 0x00
+filename  = pass13_probe.png
+Content-Type = image/png</code></pre>
+    <p>请求结果：</p>
+    <pre><code>HTTP_STATUS=500</code></pre>
+    <p>随后按精确前缀检查上传目录，没有出现 <code>pass13_probe*</code> 文件。白名单已经通过，失败发生在文件系统路径处理阶段。</p>
+
+    <h2>三、为什么现代 PHP 不再截断</h2>
+    <p>PHP 5.3.4 以后修复了文件系统路径中的 NUL 截断。当前 PHP 8.4 会拒绝包含空字节的路径，因此经典技巧失效。这并不代表源码的路径控制问题是安全的：如果攻击者能改变 <code>save_path</code>，仍要检查目录穿越、覆盖范围和异常字符。</p>
+
+    <h2>四、修复建议</h2>
+    <ul>
+      <li>上传目录必须由服务端固定配置，不能来自请求参数。</li>
+      <li>保存前规范化路径，并验证真实目标仍在允许目录内。</li>
+      <li>拒绝 NUL、换行、路径分隔符和平台特殊字符。</li>
+      <li>使用服务端随机文件名和固定安全扩展名。</li>
+    </ul>
+
+    <h2>五、复盘</h2>
+    <p>Pass-13 可以从两个层面记录：第一，源码确实把可客户端控制的路径用于写文件；第二，当前 PHP 8.4 环境拒绝了历史 NUL 截断请求。前者是代码设计问题，后者决定本次实验是否取得可执行文件。</p>
+  </main>
+</body>
+</html>

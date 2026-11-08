@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-05 .user.ini 上传与 mod_php 生效边界 Writeup - gz2008的技术博客</title>
+  <style>
+* { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+    <h1>Upload-Labs Pass-05：.user.ini 上传与 mod_php 生效边界</h1>
+    <div class="tags">
+      <span class="tag">Upload-Labs</span>
+      <span class="tag">Web</span>
+      <span class="tag">File Upload</span>
+      <span class="tag">.user.ini</span>
+      <span class="tag">PHP</span>
+    </div>
+<p>Pass-05 维护了一份很长的黑名单，但漏掉了 <code>.ini</code>，因此目录级配置文件 <code>.user.ini</code> 能通过扩展名检查。经典利用思路是在其中写入 <code>auto_prepend_file</code>，让同目录的 PHP 请求先包含一个图片探针。</p>
+
+    <div class="note"><strong>验证边界：</strong>本机成功上传 <code>.user.ini</code> 和同目录图片，但 Apache mod_php 没有应用该配置；访问 <code>upload/readme.php</code> 未出现探针标记。因此本文只认定“配置文件可上传”，不宣称当前环境已经完成配置注入。</div>
+
+    <h2>一、上传缺陷</h2>
+    <p>本关最终仍使用客户端文件名保存：</p>
+    <pre><code>$deny_ext = array(".php", ".php5", ".phtml", ".htaccess", ...);
+$file_name = trim($_FILES['upload_file']['name']);
+$file_ext = strtolower(strrchr($file_name, '.'));
+
+if (!in_array($file_ext, $deny_ext)) {
+    move_uploaded_file($_FILES['upload_file']['tmp_name'],
+                       UPLOAD_PATH.'/'.$file_name);
+}</code></pre>
+    <p><code>.user.ini</code> 的最后一个点是 <code>.ini</code>，而列表没有包含它。实际请求确认文件被保存为 <code>upload/.user.ini</code>。</p>
+
+    <h2>二、经典利用链</h2>
+    <p>测试配置只引用一个固定文本探针：</p>
+    <pre><code>auto_prepend_file=/home/ctf/labs/upload-labs/upload/pass05_probe.jpg</code></pre>
+    <p>随后上传名为 <code>pass05_probe.jpg</code> 的文件，正文为：</p>
+    <pre><code>&lt;?php echo "PASS05_PREPEND_OK"; ?&gt;</code></pre>
+    <p>如果运行环境会读取目录级 <code>.user.ini</code>，访问同目录的任意 PHP 文件时，探针应先执行。这里请求 <code>/upload/readme.php</code> 后，响应仍然只有 readme 的原始说明文本，没有出现 <code>PASS05_PREPEND_OK</code>。</p>
+
+    <h2>三、为什么当前环境没有生效</h2>
+    <p>当前靶场通过 Apache 模块运行 PHP 8.4。目录级 <code>.user.ini</code> 的典型生效模型是 PHP-CGI/FastCGI；mod_php 下不能把该文件当作 <code>.htaccess</code> 的等价配置入口。配置文件虽然进入了 Web 目录，但没有改变当前 SAPI 的 <code>auto_prepend_file</code>。</p>
+    <table>
+      <tr><th>阶段</th><th>实测结果</th></tr>
+      <tr><td>上传 <code>.user.ini</code></td><td>成功落盘</td></tr>
+      <tr><td>上传图片探针</td><td>成功落盘</td></tr>
+      <tr><td>访问同目录 PHP</td><td>未加载探针</td></tr>
+      <tr><td>当前环境代码执行</td><td>未验证</td></tr>
+    </table>
+
+    <h2>四、修复建议</h2>
+    <ul>
+      <li>拒绝点开头的隐藏文件以及所有配置类文件。</li>
+      <li>采用扩展名白名单，不接受客户端提供的最终文件名。</li>
+      <li>上传目录关闭目录级配置覆盖和脚本执行。</li>
+      <li>将业务文件放到 Web 根目录之外，通过受控下载接口读取。</li>
+    </ul>
+
+    <h2>五、复盘</h2>
+    <p>Pass-05 的价值在于提醒我们：黑名单同时遗漏了文件类型和运行模式的组合条件。写实验记录时要先确认 Web SAPI、目录配置机制和脚本执行路径，再判断某个技巧是否真的能生效。</p>
+  </main>
+</body>
+</html>

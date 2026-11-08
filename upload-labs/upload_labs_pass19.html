@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-19 旧式上传类与 PHP 8 构造兼容边界 Writeup - gz2008的技术博客</title>
+  <style>
+* { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+    <h1>Upload-Labs Pass-19：旧式上传类与 PHP 8 构造兼容边界</h1>
+    <div class="tags">
+      <span class="tag">Upload-Labs</span>
+      <span class="tag">Web</span>
+      <span class="tag">File Upload</span>
+      <span class="tag">PHP</span>
+      <span class="tag">代码审计</span>
+    </div>
+<p>Pass-19 使用一个独立上传类 <code>MyUpload</code>。关卡要求审计类里的上传顺序、扩展名判断和目标路径，而不是只看页面表单。</p>
+
+    <div class="note"><strong>验证边界：</strong>当前 PHP 8.4 中，类仍使用旧式同名构造方法 <code>function MyUpload(...)</code>。PHP 8 不再把它视为构造函数，上传对象状态没有初始化，页面返回“不能上传到临时目录”。因此本次没有取得可执行文件。</div>
+
+    <h2>一、旧式构造方法</h2>
+    <pre><code>class MyUpload {
+    function MyUpload($file_name, $tmp_file_name, $file_size, $rename_to = '') {
+        $this->cls_filename = $file_name;
+        $this->cls_tmp_filename = $tmp_file_name;
+        $this->cls_filesize = $file_size;
+        $this->cls_file_rename_to = $rename_to;
+    }
+}</code></pre>
+    <p>PHP 4/5 支持同名构造方法。PHP 8 要求 <code>__construct()</code>；没有它时，<code>new MyUpload(...)</code> 创建的对象仍保留默认空属性。随后 <code>is_uploaded_file('')</code> 返回失败，页面显示：</p>
+    <pre><code>这个文件不能上传到服务器的临时文件存储目录。</code></pre>
+
+    <h2>二、类中的上传链</h2>
+    <p>如果构造函数正常执行，类会依次检查：</p>
+    <ol>
+      <li>临时文件是否真的是上传文件。</li>
+      <li>上传目录是否可写。</li>
+      <li>最后一个扩展名是否在允许数组中。</li>
+      <li>文件大小是否超限。</li>
+      <li>是否移动成功，以及是否需要重命名。</li>
+    </ol>
+    <p>允许数组包含 <code>.gif</code>、<code>.jpg</code>、<code>.png</code>、<code>.html</code>、<code>.xml</code> 等类型，说明它仍是用扩展名决定信任，而不是根据业务场景只允许图片。</p>
+
+    <h2>三、当前环境结论</h2>
+    <table>
+      <tr><th>项目</th><th>结果</th></tr>
+      <tr><td>旧式构造方法</td><td>PHP 8.4 不执行</td></tr>
+      <tr><td>临时文件检查</td><td>对空路径失败</td></tr>
+      <tr><td>上传/落盘</td><td>未进入移动阶段</td></tr>
+      <tr><td>代码执行</td><td>未验证</td></tr>
+    </table>
+    <p>这一类差异应在实验信息中记录为“源码与运行时兼容问题”，不能把旧版教程中的成功结果直接复制到现代 PHP 环境。</p>
+
+    <h2>四、修复建议</h2>
+    <ul>
+      <li>使用 <code>__construct()</code> 并显式校验全部属性。</li>
+      <li>只允许业务需要的扩展名，不接受客户端文件名和目标路径。</li>
+      <li>由服务端生成文件名，保存后再次校验真实路径。</li>
+      <li>上传目录关闭脚本执行，并通过受控下载接口访问。</li>
+    </ul>
+
+    <h2>五、复盘</h2>
+    <p>Pass-19 提醒我们，代码审计必须同时核对源码语义和运行时版本。同名构造方法看似存在，实际在当前 PHP 中不会初始化对象；实验结论应当以实际请求和错误信息为准。</p>
+  </main>
+</body>
+</html>

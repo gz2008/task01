@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-15 getimagesize() 图片马 Writeup - gz2008的技术博客</title>
+  <style>
+* { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+    <h1>Upload-Labs Pass-15：getimagesize() 图片马</h1>
+    <div class="tags">
+      <span class="tag">Upload-Labs</span>
+      <span class="tag">Web</span>
+      <span class="tag">File Upload</span>
+      <span class="tag">getimagesize</span>
+      <span class="tag">图片马</span>
+    </div>
+<p>Pass-15 使用 <code>getimagesize()</code> 判断文件能否被识别为图片。这个函数会解析图片头并返回宽高和类型，但不会删除图片后的附加数据。因此合法图片后追加 PHP 探针仍能通过。</p>
+
+    <div class="success"><strong>验证状态：</strong>JPG、PNG、GIF 三种图片马均通过 <code>getimagesize()</code>；使用靶场文件包含页后均执行并返回 <code>IMAGE_INCLUDE_OK</code>。</div>
+
+    <h2>一、核心代码</h2>
+    <pre><code>$info = getimagesize($tmp_file);
+$ext = image_type_to_extension($info[2]);
+if (stripos('.jpeg|.png|.gif', $ext) >= 0) {
+    $img_path = UPLOAD_PATH."/".rand(10, 99).date("YmdHis").$ext;
+    move_uploaded_file($tmp_file, $img_path);
+}</code></pre>
+    <p>函数识别到合法图片后会返回类型，但临时文件内容被原样移动，没有重新编码。</p>
+
+    <h2>二、复现</h2>
+    <p>使用与 Pass-14 相同的 8×8 图片，在文件末尾追加：</p>
+    <pre><code>&lt;?php echo "IMAGE_INCLUDE_OK"; ?&gt;</code></pre>
+    <p>上传时仍使用正确的 multipart MIME 类型。服务端生成的 JPG、PNG、GIF 文件都通过检查。访问图片本身只显示图片内容；通过 <code>include.php</code> 包含后，末尾的 PHP 片段被执行。</p>
+    <table>
+      <tr><th>格式</th><th>服务端扩展名</th><th>包含结果</th></tr>
+      <tr><td>JPEG</td><td><code>.jpeg</code></td><td><code>IMAGE_INCLUDE_OK</code></td></tr>
+      <tr><td>PNG</td><td><code>.png</code></td><td><code>IMAGE_INCLUDE_OK</code></td></tr>
+      <tr><td>GIF</td><td><code>.gif</code></td><td><code>IMAGE_INCLUDE_OK</code></td></tr>
+    </table>
+
+    <h2>三、与 Pass-14 的区别</h2>
+    <p>Pass-14 只看两个字节，Pass-15 能看到图片尺寸和类型，检查强度更高，但仍只回答“这是不是一张可识别的图片”。它不回答“文件里是否还有额外脚本”，更没有执行图片重新编码。</p>
+
+    <h2>四、修复建议</h2>
+    <ul>
+      <li>使用 <code>getimagesize()</code> 后继续完整解码图片。</li>
+      <li>用服务端配置的固定格式重新编码，而不是原样保存。</li>
+      <li>把文件保存到非 Web 根目录，并禁止包含函数读取上传文件。</li>
+      <li>对图片使用独立域名或无脚本的静态文件服务。</li>
+    </ul>
+
+    <h2>五、复盘</h2>
+    <p>图片校验函数证明的是文件头可解析，不是内容纯净。Pass-15 的完整链路同时依赖“图片可通过校验”和“上传文件能被包含执行”，两者缺一不可。</p>
+  </main>
+</body>
+</html>

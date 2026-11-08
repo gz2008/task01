@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-16 exif_imagetype() 图片马 Writeup - gz2008的技术博客</title>
+  <style>
+* { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+    <h1>Upload-Labs Pass-16：exif_imagetype() 图片马</h1>
+    <div class="tags">
+      <span class="tag">Upload-Labs</span>
+      <span class="tag">Web</span>
+      <span class="tag">File Upload</span>
+      <span class="tag">exif_imagetype</span>
+      <span class="tag">图片马</span>
+    </div>
+<p>Pass-16 改用 <code>exif_imagetype()</code> 检查图片类型。这个函数比手工读取两个字节更可靠，但仍只识别文件头，不检查或清理文件尾部的 PHP 代码。</p>
+
+    <div class="success"><strong>验证状态：</strong>JPG、PNG、GIF 三种探针均通过 <code>exif_imagetype()</code>，通过文件包含页执行后均返回 <code>IMAGE_INCLUDE_OK</code>。</div>
+
+    <h2>一、校验逻辑</h2>
+    <pre><code>$image_type = exif_imagetype($tmp_file);
+switch ($image_type) {
+    case IMAGETYPE_GIF:  return "gif";
+    case IMAGETYPE_JPEG: return "jpg";
+    case IMAGETYPE_PNG:  return "png";
+    default: return false;
+}</code></pre>
+    <p>通过后，服务端用随机数字加安全图片扩展名保存，但没有对文件内容二次处理。</p>
+
+    <h2>二、图片马构造与上传</h2>
+    <p>三种合法图片末尾追加同一条固定输出语句：</p>
+    <pre><code>&lt;?php echo "IMAGE_INCLUDE_OK"; ?&gt;</code></pre>
+    <p>上传后的文件仍是可识别图片，直接访问不会执行 PHP。靶场自带 <code>include.php</code>，用其读取上传文件时，PHP 解释器会处理尾部代码。</p>
+
+    <h2>三、实测结果</h2>
+    <table>
+      <tr><th>格式</th><th>上传结果</th><th>包含后</th></tr>
+      <tr><td>JPG</td><td>成功</td><td><code>IMAGE_INCLUDE_OK</code></td></tr>
+      <tr><td>PNG</td><td>成功</td><td><code>IMAGE_INCLUDE_OK</code></td></tr>
+      <tr><td>GIF</td><td>成功</td><td><code>IMAGE_INCLUDE_OK</code></td></tr>
+    </table>
+
+    <h2>四、根因</h2>
+    <p><code>exif_imagetype()</code> 提高了“文件头是否像图片”的判断准确度，却不会证明文件只包含图片。只要业务同时存在文件包含、模板读取或其他解释器入口，附加脚本仍可能被执行。</p>
+
+    <h2>五、修复建议</h2>
+    <ul>
+      <li>完整解码并重新编码图片，丢弃未知段和尾随数据。</li>
+      <li>固定服务端输出格式和文件名。</li>
+      <li>上传目录不得被 PHP 包含，也不应允许脚本处理。</li>
+      <li>对图片服务使用静态域名和严格的响应头。</li>
+    </ul>
+
+    <h2>六、复盘</h2>
+    <p>从 Pass-14 到 Pass-16，校验函数逐渐变强，但三个关卡都倒在同一件事上：只检查开头，不重建文件。修复必须从“重新生成可信文件”出发，而不是继续叠加文件头判断。</p>
+  </main>
+</body>
+</html>

