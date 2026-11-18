@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Less-48 数字型 ORDER BY 时间盲注 - SQLi-Labs</title>
+  <link rel="stylesheet" href="assets/sqli-labs.css">
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 SQLi-Labs 关卡列表</a>
+    <article class="article">
+      <p class="eyebrow">SQLi-Labs · Less-48</p>
+      <h1>Less-48：数字型 ORDER BY 时间盲注</h1>
+      <p class="lead">记录本题的输入位置、SQL 拼接上下文、实际验证结果和修复思路。</p>
+      <div class="tags"><span class="tag"># ORDER BY / 时间盲注</span><span class="tag"># 本地授权靶场</span><span class="tag"># MySQL</span></div>
+
+      <h2>题目信息</h2>
+      <table class="meta-table">
+        <tr><th>关卡</th><td>Less-48</td></tr>
+        <tr><th>类型</th><td>ORDER BY / 时间盲注</td></tr>
+        <tr><th>输入点</th><td>GET 参数 <code>sort</code></td></tr>
+        <tr><th>环境</th><td>本地授权 SQLi-Labs，MySQL 5.5.44</td></tr>
+        <tr><th>Flag</th><td>普通关卡无 flag；挑战关以提交随机 key 后的成功页面为准</td></tr>
+      </table>
+
+
+      <h2>原 SQL 上下文</h2>
+      <pre><code>SELECT * FROM users ORDER BY $id</code></pre>
+      <p>本题的关键是先确认输入落在字符串、数字、括号、请求头还是其他 SQL 子句中，再决定闭合与读取方式。</p>
+
+      <h2>漏洞分析</h2>
+      <p>ORDER BY 表达式会针对结果行计算，因此 sleep 时间可能与行数相乘。</p>
+
+      <h2>利用与验证</h2>
+
+      <pre><code>sort=if(substr(database(),1,1)=&#x27;s&#x27;,sleep(0.2),0)</code></pre>
+      <div class="result">真条件按返回行累计延迟，本次实测约 4.4 秒；假条件较快。</div>
+      <div class="callout"><strong>实测备注：</strong>测量时间时要使用小延迟并比较真、假两次请求。</div>
+
+      <h2>修复建议</h2>
+      <ul>
+        <li>使用 PDO 或 mysqli 预处理语句绑定参数，禁止把输入直接拼接进 SQL。</li>
+        <li>对数字型参数做整数转换和范围校验；字符串参数明确类型与最大长度。</li>
+        <li>关闭生产环境的 SQL 详细报错，避免库名、表名和语法结构泄露。</li>
+        <li>数据库账号遵循最小权限，禁用不必要的多语句、FILE 和跨库能力。</li>
+      </ul>
+
+      <h2>复盘</h2>
+      <p>先识别闭合上下文，再选择报错、联合查询、布尔盲注、时间盲注或堆叠副作用作为验证通道。payload 只是结果，真正可复用的是判断流程。</p>
+
+      <nav class="next-prev" aria-label="关卡导航">
+        <a href="sqli_labs_less47.html">← Less-47</a>
+        <a href="sqli_labs_less49.html">Less-49 →</a>
+      </nav>
+    </article>
+  </main>
+</body>
+</html>

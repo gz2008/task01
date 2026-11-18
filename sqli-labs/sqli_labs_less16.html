@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Less-16 POST 双引号时间盲注 - SQLi-Labs</title>
+  <link rel="stylesheet" href="assets/sqli-labs.css">
+</head>
+<body>
+  <main class="container">
+    <a class="back-link" href="index.html">← 返回 SQLi-Labs 关卡列表</a>
+    <article class="article">
+      <p class="eyebrow">SQLi-Labs · Less-16</p>
+      <h1>Less-16：POST 双引号时间盲注</h1>
+      <p class="lead">记录本题的输入位置、SQL 拼接上下文、实际验证结果和修复思路。</p>
+      <div class="tags"><span class="tag"># 时间盲注</span><span class="tag"># 本地授权靶场</span><span class="tag"># MySQL</span></div>
+
+      <h2>题目信息</h2>
+      <table class="meta-table">
+        <tr><th>关卡</th><td>Less-16</td></tr>
+        <tr><th>类型</th><td>时间盲注</td></tr>
+        <tr><th>输入点</th><td>POST 字段 <code>uname</code>、<code>passwd</code></td></tr>
+        <tr><th>环境</th><td>本地授权 SQLi-Labs，MySQL 5.5.44</td></tr>
+        <tr><th>Flag</th><td>普通关卡无 flag；挑战关以提交随机 key 后的成功页面为准</td></tr>
+      </table>
+
+
+      <h2>原 SQL 上下文</h2>
+      <pre><code>SELECT username, password FROM users WHERE username=(&quot;$uname&quot;) and password=(&quot;$passwd&quot;) LIMIT 0,1</code></pre>
+      <p>本题的关键是先确认输入落在字符串、数字、括号、请求头还是其他 SQL 子句中，再决定闭合与读取方式。</p>
+
+      <h2>漏洞分析</h2>
+      <p>本关使用双引号加括号包装，闭合后把条件改成 sleep。由于表达式按返回行计算，延迟会随行数累积。</p>
+
+      <h2>利用与验证</h2>
+
+      <pre><code>uname=admin&quot;) or sleep(0.2)-- -&amp;passwd=x&amp;submit=Submit</code></pre>
+      <div class="result">请求出现多行累计延迟，本次实测约 5.15 秒；普通请求明显更快。</div>
+
+
+      <h2>修复建议</h2>
+      <ul>
+        <li>使用 PDO 或 mysqli 预处理语句绑定参数，禁止把输入直接拼接进 SQL。</li>
+        <li>对数字型参数做整数转换和范围校验；字符串参数明确类型与最大长度。</li>
+        <li>关闭生产环境的 SQL 详细报错，避免库名、表名和语法结构泄露。</li>
+        <li>数据库账号遵循最小权限，禁用不必要的多语句、FILE 和跨库能力。</li>
+      </ul>
+
+      <h2>复盘</h2>
+      <p>先识别闭合上下文，再选择报错、联合查询、布尔盲注、时间盲注或堆叠副作用作为验证通道。payload 只是结果，真正可复用的是判断流程。</p>
+
+      <nav class="next-prev" aria-label="关卡导航">
+        <a href="sqli_labs_less15.html">← Less-15</a>
+        <a href="sqli_labs_less17.html">Less-17 →</a>
+      </nav>
+    </article>
+  </main>
+</body>
+</html>

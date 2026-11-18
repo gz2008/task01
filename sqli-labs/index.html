@@ -4,74 +4,498 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SQLi-Labs Writeups</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 34px 20px 60px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-      color: #172033;
-      background: #f5f8fc;
-      line-height: 1.6;
-    }
-    .container { width: min(840px, 100%); margin: 0 auto; }
-    .back-link { color: #2563eb; text-decoration: none; font-weight: 600; }
-    .back-link:hover { text-decoration: underline; }
-    header { margin: 28px 0; }
-    h1 { margin: 0 0 8px; font-size: clamp(2rem, 6vw, 3rem); }
-    .subtitle { margin: 0; color: #64748b; }
-    .post-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
-    .post-list a {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 18px;
-      padding: 17px 20px;
-      color: #172033;
-      text-decoration: none;
-      background: #ffffff;
-      border: 1px solid #e5ebf3;
-      border-radius: 14px;
-      box-shadow: 0 5px 18px rgba(43, 74, 125, 0.05);
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-    .post-list a:hover {
-      transform: translateX(5px);
-      color: #1d4ed8;
-      border-color: #9bbaf7;
-      box-shadow: 0 8px 24px rgba(43, 74, 125, 0.1);
-    }
-    .post-title { font-weight: 600; }
-    .post-date { flex: 0 0 auto; color: #94a3b8; font-size: 0.9rem; }
-    @media (max-width: 560px) {
-      .post-list a { align-items: flex-start; flex-direction: column; gap: 5px; }
-    }
-  </style>
+  <link rel="stylesheet" href="assets/sqli-labs.css">
 </head>
 <body>
   <main class="container">
     <a class="back-link" href="../index.html">← 返回总入口</a>
-    <header>
+    <header class="index-header">
+      <p class="eyebrow">Local Authorized Lab</p>
       <h1>SQLi-Labs</h1>
-      <p class="subtitle">共 3 篇解题记录</p>
+      <p class="subtitle">共 69 篇逐关解题记录，覆盖 Less-1 至 Less-65，并包含 25a、26a、27a、28a。</p>
     </header>
     <ul class="post-list">
       <li>
-        <a href="sqli_labs_1_65.html">
-          <span class="post-title">SQLi-Labs 1-65：全关卡通关与注入类型复盘</span>
-          <span class="post-date">2026-11-18</span>
-        </a>
-      </li>
-      <li>
         <a href="sqli_labs_less1.html">
-          <span class="post-title">Less-1：GET 字符型报错与联合查询注入</span>
-          <span class="post-date">2026-11-09</span>
+          <span class="level">Less-1</span>
+          <span class="post-title">GET 字符型报错与联合查询</span>
+          <span class="post-meta">报错 / UNION · 2026-11-18</span>
         </a>
       </li>
       <li>
         <a href="sqli_labs_less2.html">
-          <span class="post-title">Less-2：GET 数字型报错与联合查询注入</span>
-          <span class="post-date">2026-11-09</span>
+          <span class="level">Less-2</span>
+          <span class="post-title">GET 数字型报错与联合查询</span>
+          <span class="post-meta">报错 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less3.html">
+          <span class="level">Less-3</span>
+          <span class="post-title">字符串括号型联合查询</span>
+          <span class="post-meta">报错 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less4.html">
+          <span class="level">Less-4</span>
+          <span class="post-title">双引号括号型联合查询</span>
+          <span class="post-meta">报错 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less5.html">
+          <span class="level">Less-5</span>
+          <span class="post-title">单引号报错注入</span>
+          <span class="post-meta">报错注入 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less6.html">
+          <span class="level">Less-6</span>
+          <span class="post-title">双引号报错注入</span>
+          <span class="post-meta">报错注入 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less7.html">
+          <span class="level">Less-7</span>
+          <span class="post-title">双层括号与文件写出</span>
+          <span class="post-meta">UNION / 文件写出 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less8.html">
+          <span class="level">Less-8</span>
+          <span class="post-title">单引号布尔盲注</span>
+          <span class="post-meta">布尔盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less9.html">
+          <span class="level">Less-9</span>
+          <span class="post-title">单引号时间盲注</span>
+          <span class="post-meta">时间盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less10.html">
+          <span class="level">Less-10</span>
+          <span class="post-title">双引号时间盲注</span>
+          <span class="post-meta">时间盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less11.html">
+          <span class="level">Less-11</span>
+          <span class="post-title">POST 单引号登录注入</span>
+          <span class="post-meta">登录绕过 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less12.html">
+          <span class="level">Less-12</span>
+          <span class="post-title">POST 双引号括号登录注入</span>
+          <span class="post-meta">登录绕过 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less13.html">
+          <span class="level">Less-13</span>
+          <span class="post-title">POST 单引号括号盲注</span>
+          <span class="post-meta">布尔盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less14.html">
+          <span class="level">Less-14</span>
+          <span class="post-title">POST 双引号盲注</span>
+          <span class="post-meta">布尔盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less15.html">
+          <span class="level">Less-15</span>
+          <span class="post-title">POST 单引号布尔盲注</span>
+          <span class="post-meta">布尔盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less16.html">
+          <span class="level">Less-16</span>
+          <span class="post-title">POST 双引号时间盲注</span>
+          <span class="post-meta">时间盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less17.html">
+          <span class="level">Less-17</span>
+          <span class="post-title">UPDATE 密码字段报错注入</span>
+          <span class="post-meta">UPDATE / 报错注入 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less18.html">
+          <span class="level">Less-18</span>
+          <span class="post-title">User-Agent 请求头注入</span>
+          <span class="post-meta">请求头 / INSERT 报错 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less19.html">
+          <span class="level">Less-19</span>
+          <span class="post-title">Referer 请求头注入</span>
+          <span class="post-meta">请求头 / INSERT 报错 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less20.html">
+          <span class="level">Less-20</span>
+          <span class="post-title">Cookie 联合查询注入</span>
+          <span class="post-meta">Cookie / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less21.html">
+          <span class="level">Less-21</span>
+          <span class="post-title">Base64 Cookie 单引号括号注入</span>
+          <span class="post-meta">Cookie / 编码 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less22.html">
+          <span class="level">Less-22</span>
+          <span class="post-title">Base64 Cookie 双引号注入</span>
+          <span class="post-meta">Cookie / 编码 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less23.html">
+          <span class="level">Less-23</span>
+          <span class="post-title">无注释符联合查询</span>
+          <span class="post-meta">过滤绕过 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less24.html">
+          <span class="level">Less-24</span>
+          <span class="post-title">第二阶注入修改密码</span>
+          <span class="post-meta">第二阶注入 / UPDATE · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less25.html">
+          <span class="level">Less-25</span>
+          <span class="post-title">OR/AND 关键字过滤绕过</span>
+          <span class="post-meta">过滤绕过 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less25a.html">
+          <span class="level">Less-25a</span>
+          <span class="post-title">数字型盲注与 OR/AND 过滤</span>
+          <span class="post-meta">过滤绕过 / 布尔盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less26.html">
+          <span class="level">Less-26</span>
+          <span class="post-title">空格、注释和逻辑符过滤</span>
+          <span class="post-meta">过滤绕过 / 报错注入 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less26a.html">
+          <span class="level">Less-26a</span>
+          <span class="post-title">括号盲注与空格过滤</span>
+          <span class="post-meta">过滤绕过 / 布尔盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less27.html">
+          <span class="level">Less-27</span>
+          <span class="post-title">SELECT/UNION 大小写过滤绕过</span>
+          <span class="post-meta">过滤绕过 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less27a.html">
+          <span class="level">Less-27a</span>
+          <span class="post-title">双引号数字上下文关键字绕过</span>
+          <span class="post-meta">过滤绕过 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less28.html">
+          <span class="level">Less-28</span>
+          <span class="post-title">union select 连续关键字过滤</span>
+          <span class="post-meta">过滤绕过 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less28a.html">
+          <span class="level">Less-28a</span>
+          <span class="post-title">单次 union select 过滤绕过</span>
+          <span class="post-meta">过滤绕过 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less29.html">
+          <span class="level">Less-29</span>
+          <span class="post-title">HTTP 参数污染绕过 WAF</span>
+          <span class="post-meta">HPP / WAF 绕过 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less30.html">
+          <span class="level">Less-30</span>
+          <span class="post-title">HPP 双引号数字上下文</span>
+          <span class="post-meta">HPP / WAF 绕过 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less31.html">
+          <span class="level">Less-31</span>
+          <span class="post-title">HPP 双引号括号上下文</span>
+          <span class="post-meta">HPP / WAF 绕过 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less32.html">
+          <span class="level">Less-32</span>
+          <span class="post-title">addslashes 宽字节绕过</span>
+          <span class="post-meta">宽字节 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less33.html">
+          <span class="level">Less-33</span>
+          <span class="post-title">addslashes 宽字节变体</span>
+          <span class="post-meta">宽字节 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less34.html">
+          <span class="level">Less-34</span>
+          <span class="post-title">POST addslashes 宽字节绕过</span>
+          <span class="post-meta">宽字节 / POST / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less35.html">
+          <span class="level">Less-35</span>
+          <span class="post-title">数字型上下文中的无效转义</span>
+          <span class="post-meta">数字型 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less36.html">
+          <span class="level">Less-36</span>
+          <span class="post-title">mysql_real_escape_string 宽字节绕过</span>
+          <span class="post-meta">宽字节 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less37.html">
+          <span class="level">Less-37</span>
+          <span class="post-title">POST mysql_real_escape_string 宽字节绕过</span>
+          <span class="post-meta">宽字节 / POST / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less38.html">
+          <span class="level">Less-38</span>
+          <span class="post-title">单引号堆叠查询</span>
+          <span class="post-meta">堆叠查询 / INSERT · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less39.html">
+          <span class="level">Less-39</span>
+          <span class="post-title">数字型堆叠查询</span>
+          <span class="post-meta">堆叠查询 / INSERT · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less40.html">
+          <span class="level">Less-40</span>
+          <span class="post-title">单引号括号盲堆叠</span>
+          <span class="post-meta">堆叠查询 / 盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less41.html">
+          <span class="level">Less-41</span>
+          <span class="post-title">数字型盲堆叠</span>
+          <span class="post-meta">堆叠查询 / 盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less42.html">
+          <span class="level">Less-42</span>
+          <span class="post-title">登录密码堆叠查询</span>
+          <span class="post-meta">堆叠查询 / 登录 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less43.html">
+          <span class="level">Less-43</span>
+          <span class="post-title">括号密码字段堆叠查询</span>
+          <span class="post-meta">堆叠查询 / 登录 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less44.html">
+          <span class="level">Less-44</span>
+          <span class="post-title">无报错密码堆叠</span>
+          <span class="post-meta">堆叠查询 / 盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less45.html">
+          <span class="level">Less-45</span>
+          <span class="post-title">无报错括号密码堆叠</span>
+          <span class="post-meta">堆叠查询 / 盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less46.html">
+          <span class="level">Less-46</span>
+          <span class="post-title">数字型 ORDER BY 报错注入</span>
+          <span class="post-meta">ORDER BY / 报错注入 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less47.html">
+          <span class="level">Less-47</span>
+          <span class="post-title">单引号 ORDER BY 报错注入</span>
+          <span class="post-meta">ORDER BY / 报错注入 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less48.html">
+          <span class="level">Less-48</span>
+          <span class="post-title">数字型 ORDER BY 时间盲注</span>
+          <span class="post-meta">ORDER BY / 时间盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less49.html">
+          <span class="level">Less-49</span>
+          <span class="post-title">单引号 ORDER BY 时间盲注</span>
+          <span class="post-meta">ORDER BY / 时间盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less50.html">
+          <span class="level">Less-50</span>
+          <span class="post-title">数字型 ORDER BY 堆叠</span>
+          <span class="post-meta">ORDER BY / 堆叠查询 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less51.html">
+          <span class="level">Less-51</span>
+          <span class="post-title">单引号 ORDER BY 堆叠</span>
+          <span class="post-meta">ORDER BY / 堆叠查询 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less52.html">
+          <span class="level">Less-52</span>
+          <span class="post-title">数字型 ORDER BY 盲堆叠</span>
+          <span class="post-meta">ORDER BY / 堆叠查询 / 盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less53.html">
+          <span class="level">Less-53</span>
+          <span class="post-title">单引号 ORDER BY 盲堆叠</span>
+          <span class="post-meta">ORDER BY / 堆叠查询 / 盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less54.html">
+          <span class="level">Less-54</span>
+          <span class="post-title">挑战关 1：单引号 UNION</span>
+          <span class="post-meta">挑战关 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less55.html">
+          <span class="level">Less-55</span>
+          <span class="post-title">挑战关 2：数字括号 UNION</span>
+          <span class="post-meta">挑战关 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less56.html">
+          <span class="level">Less-56</span>
+          <span class="post-title">挑战关 3：单引号括号 UNION</span>
+          <span class="post-meta">挑战关 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less57.html">
+          <span class="level">Less-57</span>
+          <span class="post-title">挑战关 4：双引号 UNION</span>
+          <span class="post-meta">挑战关 / UNION · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less58.html">
+          <span class="level">Less-58</span>
+          <span class="post-title">挑战关 5：单引号报错</span>
+          <span class="post-meta">挑战关 / 报错注入 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less59.html">
+          <span class="level">Less-59</span>
+          <span class="post-title">挑战关 6：数字型报错</span>
+          <span class="post-meta">挑战关 / 报错注入 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less60.html">
+          <span class="level">Less-60</span>
+          <span class="post-title">挑战关 7：双引号括号报错</span>
+          <span class="post-meta">挑战关 / 报错注入 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less61.html">
+          <span class="level">Less-61</span>
+          <span class="post-title">挑战关 8：单引号双层括号报错</span>
+          <span class="post-meta">挑战关 / 报错注入 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less62.html">
+          <span class="level">Less-62</span>
+          <span class="post-title">挑战关 9：盲注压缩读取</span>
+          <span class="post-meta">挑战关 / 盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less63.html">
+          <span class="level">Less-63</span>
+          <span class="post-title">挑战关 10：单引号盲注</span>
+          <span class="post-meta">挑战关 / 盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less64.html">
+          <span class="level">Less-64</span>
+          <span class="post-title">挑战关 11：双括号数字型盲注</span>
+          <span class="post-meta">挑战关 / 盲注 · 2026-11-18</span>
+        </a>
+      </li>
+      <li>
+        <a href="sqli_labs_less65.html">
+          <span class="level">Less-65</span>
+          <span class="post-title">挑战关 12：双引号数字型盲注</span>
+          <span class="post-meta">挑战关 / 盲注 · 2026-11-18</span>
         </a>
       </li>
     </ul>
